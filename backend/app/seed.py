@@ -11,7 +11,7 @@ from app.models.models import (
 )
 
 
-def seed_database():
+def reset_and_seed_database():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 
@@ -518,6 +518,22 @@ def seed_database():
     finally:
         db.close()
 
+def seed_if_empty():
+    Base.metadata.create_all(bind=engine)
+
+    db = SessionLocal()
+
+    try:
+        existing_meeting = db.query(Meeting).first()
+
+        if existing_meeting:
+            print("Database already contains meetings. Skipping seed.")
+            return
+
+    finally:
+        db.close()
+
+    reset_and_seed_database()
 
 if __name__ == "__main__":
-    seed_database()
+    reset_and_seed_database()

@@ -4,7 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import Base, engine
 from app.models import models
 from app.routers.meetings import router as meetings_router
-
+from app.routers.action_items import router as action_items_router
+from app.routers.transcripts import router as transcripts_router
 
 app = FastAPI(
     title="Fireflies Clone API",
@@ -23,6 +24,10 @@ app.add_middleware(
 )
 
 app.include_router(meetings_router)
+app.include_router(action_items_router)
+app.include_router(meetings_router)
+app.include_router(action_items_router)
+app.include_router(transcripts_router)
 
 
 @app.get("/")

@@ -18,13 +18,25 @@ import {
   ListChecks,
   MoreHorizontal,
   Pause,
+  Pencil,
   Play,
+  Plus,
   Search,
   Share2,
   Sparkles,
+  Trash2,
+  X,
 } from "lucide-react";
 
-import { getMeeting } from "../../../lib/api";
+import {
+  createActionItem,
+  deleteActionItem,
+  getMeeting,
+  updateActionItem,
+  updateMeeting,
+  updateTranscriptSegment,
+} from "../../../lib/api";
+
 import type {
   ActionItem,
   Chapter,
@@ -44,74 +56,157 @@ export default function MeetingPage({
   const { id } = use(params);
   const router = useRouter();
 
+  // ============================================================
+  // Meeting state
+  // ============================================================
+
   const [meeting, setMeeting] =
     useState<MeetingDetail | null>(null);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [loading, setLoading] =
+    useState(true);
 
-  const [transcriptSearch, setTranscriptSearch] =
+  const [error, setError] =
     useState("");
 
-  // Player state
-  const [currentTime, setCurrentTime] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+  // ============================================================
+  // Transcript state
+  // ============================================================
 
-  // Used to keep our simulated player synced with real elapsed time.
-  const playbackStartRef = useRef<number | null>(null);
-  const playbackOffsetRef = useRef(0);
+  const [
+    transcriptSearch,
+    setTranscriptSearch,
+  ] = useState("");
 
-  // Used for scrolling the active transcript line into view.
-  const transcriptRefs = useRef<
-    Record<number, HTMLDivElement | null>
+  const [
+    isEditingTranscript,
+    setIsEditingTranscript,
+  ] = useState(false);
+
+  const [
+    editedTranscript,
+    setEditedTranscript,
+  ] = useState<
+    Record<number, string>
   >({});
 
-  // ----------------------------
+  const [
+    savingTranscript,
+    setSavingTranscript,
+  ] = useState(false);
+
+  const [
+    transcriptEditError,
+    setTranscriptEditError,
+  ] = useState("");
+
+  // ============================================================
+  // Player state
+  // ============================================================
+
+  const [
+    currentTime,
+    setCurrentTime,
+  ] = useState(0);
+
+  const [
+    isPlaying,
+    setIsPlaying,
+  ] = useState(false);
+
+  const playbackStartRef =
+    useRef<number | null>(null);
+
+  const playbackOffsetRef =
+    useRef(0);
+
+  const transcriptRefs =
+    useRef<
+      Record<
+        number,
+        HTMLDivElement | null
+      >
+    >({});
+
+  // ============================================================
+  // Action item state
+  // ============================================================
+
+  const [
+    newActionText,
+    setNewActionText,
+  ] = useState("");
+
+  const [
+    showAddAction,
+    setShowAddAction,
+  ] = useState(false);
+
+  const [
+    actionError,
+    setActionError,
+  ] = useState("");
+
+  // ============================================================
   // Load meeting
-  // ----------------------------
+  // ============================================================
 
   useEffect(() => {
     const meetingId = Number(id);
 
-    if (Number.isNaN(meetingId)) {
-      setError("Invalid meeting.");
+    if (
+      Number.isNaN(meetingId)
+    ) {
+      setError(
+        "Invalid meeting."
+      );
+
       setLoading(false);
+
       return;
     }
 
-    const loadMeeting = async () => {
-      try {
-        setLoading(true);
-        setError("");
+    const loadMeeting =
+      async () => {
+        try {
+          setLoading(true);
+          setError("");
 
-        const data = await getMeeting(meetingId);
+          const data =
+            await getMeeting(
+              meetingId
+            );
 
-        setMeeting(data);
-        setCurrentTime(0);
-        setIsPlaying(false);
-      } catch (err) {
-        console.error(
-          "Failed to load meeting:",
-          err
-        );
+          setMeeting(data);
 
-        setError(
-          "Unable to load this meeting."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
+          setCurrentTime(0);
+          setIsPlaying(false);
+        } catch (err) {
+          console.error(
+            "Failed to load meeting:",
+            err
+          );
+
+          setError(
+            "Unable to load this meeting."
+          );
+        } finally {
+          setLoading(false);
+        }
+      };
 
     loadMeeting();
   }, [id]);
 
-  // ----------------------------
-  // Simulated player
-  // ----------------------------
+  // ============================================================
+  // Simulated media player
+  // ============================================================
 
   useEffect(() => {
-    if (!isPlaying || !meeting) {
+    if (
+      !isPlaying ||
+      !meeting
+    ) {
       return;
     }
 
@@ -158,7 +253,9 @@ export default function MeetingPage({
         return;
       }
 
-      setCurrentTime(nextTime);
+      setCurrentTime(
+        nextTime
+      );
 
       animationFrameId =
         requestAnimationFrame(
@@ -176,11 +273,14 @@ export default function MeetingPage({
         animationFrameId
       );
     };
-  }, [isPlaying, meeting]);
+  }, [
+    isPlaying,
+    meeting,
+  ]);
 
-  // ----------------------------
-  // Derived transcript state
-  // ----------------------------
+  // ============================================================
+  // Active transcript segment
+  // ============================================================
 
   const activeSegment =
     meeting?.transcript_segments.find(
@@ -191,9 +291,11 @@ export default function MeetingPage({
           segment.end_time
     ) ?? null;
 
-  // Auto-scroll active transcript
   useEffect(() => {
-    if (!activeSegment) {
+    if (
+      !activeSegment ||
+      isEditingTranscript
+    ) {
       return;
     }
 
@@ -206,13 +308,25 @@ export default function MeetingPage({
       behavior: "smooth",
       block: "nearest",
     });
-  }, [activeSegment?.id]);
+  }, [
+    activeSegment?.id,
+    isEditingTranscript,
+  ]);
+
+  // ============================================================
+  // Loading / error
+  // ============================================================
 
   if (loading) {
-    return <MeetingLoading />;
+    return (
+      <MeetingLoading />
+    );
   }
 
-  if (error || !meeting) {
+  if (
+    error ||
+    !meeting
+  ) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#121212] text-white">
         <div className="text-center">
@@ -228,7 +342,9 @@ export default function MeetingPage({
           <button
             type="button"
             onClick={() =>
-              router.push("/meetings")
+              router.push(
+                "/meetings"
+              )
             }
             className="mt-5 rounded-md bg-[#6d32e9] px-4 py-2 text-sm font-medium text-white"
           >
@@ -239,9 +355,9 @@ export default function MeetingPage({
     );
   }
 
-  // ----------------------------
-  // Search
-  // ----------------------------
+  // ============================================================
+  // Transcript search
+  // ============================================================
 
   const searchTerm =
     transcriptSearch
@@ -255,20 +371,30 @@ export default function MeetingPage({
           (segment) =>
             segment.text
               .toLowerCase()
-              .includes(searchTerm)
+              .includes(
+                searchTerm
+              )
         );
 
-  // ----------------------------
+  // ============================================================
   // Player helpers
-  // ----------------------------
+  // ============================================================
 
-  const seekTo = (seconds: number) => {
-    const safeTime = Math.min(
-      Math.max(seconds, 0),
-      meeting.duration_seconds
+  const seekTo = (
+    seconds: number
+  ) => {
+    const safeTime =
+      Math.min(
+        Math.max(
+          seconds,
+          0
+        ),
+        meeting.duration_seconds
+      );
+
+    setCurrentTime(
+      safeTime
     );
-
-    setCurrentTime(safeTime);
 
     playbackOffsetRef.current =
       safeTime;
@@ -277,49 +403,474 @@ export default function MeetingPage({
       performance.now();
   };
 
-  const togglePlayback = () => {
-    if (
-      currentTime >=
-      meeting.duration_seconds
-    ) {
-      setCurrentTime(0);
+  const togglePlayback =
+    () => {
+      if (
+        currentTime >=
+        meeting.duration_seconds
+      ) {
+        setCurrentTime(0);
 
-      playbackOffsetRef.current = 0;
-    }
+        playbackOffsetRef.current =
+          0;
+      }
 
-    setIsPlaying(
-      (previous) => !previous
-    );
-  };
+      setIsPlaying(
+        (previous) =>
+          !previous
+      );
+    };
 
   const handleSeek = (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     seekTo(
-      Number(event.target.value)
+      Number(
+        event.target.value
+      )
     );
   };
 
   const progress =
-    meeting.duration_seconds > 0
+    meeting.duration_seconds >
+    0
       ? (currentTime /
           meeting.duration_seconds) *
         100
       : 0;
 
+  // ============================================================
+  // Meeting rename
+  // ============================================================
+
+  const handleRenameMeeting =
+    async () => {
+      if (!meeting) {
+        return;
+      }
+
+      const newTitle =
+        window.prompt(
+          "Rename meeting",
+          meeting.title
+        );
+
+      if (
+        newTitle === null
+      ) {
+        return;
+      }
+
+      const cleanedTitle =
+        newTitle.trim();
+
+      if (
+        !cleanedTitle ||
+        cleanedTitle ===
+          meeting.title
+      ) {
+        return;
+      }
+
+      try {
+        const updated =
+          await updateMeeting(
+            meeting.id,
+            {
+              title:
+                cleanedTitle,
+            }
+          );
+
+        setMeeting(
+          updated
+        );
+      } catch (err) {
+        console.error(err);
+
+        window.alert(
+          "Could not rename meeting."
+        );
+      }
+    };
+
+  // ============================================================
+  // Action item CRUD
+  // ============================================================
+
+  const handleToggleActionItem =
+    async (
+      actionItem: ActionItem
+    ) => {
+      try {
+        setActionError("");
+
+        const updated =
+          await updateActionItem(
+            actionItem.id,
+            {
+              is_completed:
+                !actionItem.is_completed,
+            }
+          );
+
+        setMeeting({
+          ...meeting,
+
+          action_items:
+            meeting.action_items.map(
+              (item) =>
+                item.id ===
+                updated.id
+                  ? updated
+                  : item
+            ),
+        });
+      } catch (err) {
+        console.error(err);
+
+        setActionError(
+          "Could not update action item."
+        );
+      }
+    };
+
+  const handleCreateActionItem =
+    async () => {
+      const text =
+        newActionText.trim();
+
+      if (!text) {
+        return;
+      }
+
+      try {
+        setActionError("");
+
+        const created =
+          await createActionItem(
+            meeting.id,
+            {
+              text,
+            }
+          );
+
+        setMeeting({
+          ...meeting,
+
+          action_items: [
+            ...meeting.action_items,
+            created,
+          ],
+        });
+
+        setNewActionText(
+          ""
+        );
+
+        setShowAddAction(
+          false
+        );
+      } catch (err) {
+        console.error(err);
+
+        setActionError(
+          "Could not add action item."
+        );
+      }
+    };
+
+  const handleEditActionItem =
+    async (
+      actionItem: ActionItem
+    ) => {
+      const newText =
+        window.prompt(
+          "Edit action item",
+          actionItem.text
+        );
+
+      if (
+        newText === null
+      ) {
+        return;
+      }
+
+      const cleanedText =
+        newText.trim();
+
+      if (!cleanedText) {
+        return;
+      }
+
+      try {
+        setActionError("");
+
+        const updated =
+          await updateActionItem(
+            actionItem.id,
+            {
+              text:
+                cleanedText,
+            }
+          );
+
+        setMeeting({
+          ...meeting,
+
+          action_items:
+            meeting.action_items.map(
+              (item) =>
+                item.id ===
+                updated.id
+                  ? updated
+                  : item
+            ),
+        });
+      } catch (err) {
+        console.error(err);
+
+        setActionError(
+          "Could not edit action item."
+        );
+      }
+    };
+
+  const handleDeleteActionItem =
+    async (
+      actionItem: ActionItem
+    ) => {
+      const confirmed =
+        window.confirm(
+          `Delete "${actionItem.text}"?`
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        setActionError("");
+
+        await deleteActionItem(
+          actionItem.id
+        );
+
+        setMeeting({
+          ...meeting,
+
+          action_items:
+            meeting.action_items.filter(
+              (item) =>
+                item.id !==
+                actionItem.id
+            ),
+        });
+      } catch (err) {
+        console.error(err);
+
+        setActionError(
+          "Could not delete action item."
+        );
+      }
+    };
+
+  // ============================================================
+  // Transcript editing
+  // ============================================================
+
+  const handleStartTranscriptEdit =
+    () => {
+      const initialValues: Record<
+        number,
+        string
+      > = {};
+
+      meeting.transcript_segments.forEach(
+        (segment) => {
+          initialValues[
+            segment.id
+          ] =
+            segment.text;
+        }
+      );
+
+      setEditedTranscript(
+        initialValues
+      );
+
+      setTranscriptEditError(
+        ""
+      );
+
+      setIsEditingTranscript(
+        true
+      );
+
+      // Pause playback while
+      // editing transcript.
+      setIsPlaying(false);
+    };
+
+  const handleCancelTranscriptEdit =
+    () => {
+      setEditedTranscript(
+        {}
+      );
+
+      setTranscriptEditError(
+        ""
+      );
+
+      setIsEditingTranscript(
+        false
+      );
+    };
+
+  const handleSaveTranscript =
+    async () => {
+      try {
+        setSavingTranscript(
+          true
+        );
+
+        setTranscriptEditError(
+          ""
+        );
+
+        // Reject blank
+        // transcript segments.
+        const hasEmptySegment =
+          meeting.transcript_segments.some(
+            (segment) =>
+              !(
+                editedTranscript[
+                  segment.id
+                ] ??
+                segment.text
+              ).trim()
+          );
+
+        if (
+          hasEmptySegment
+        ) {
+          setTranscriptEditError(
+            "Transcript lines cannot be empty."
+          );
+
+          return;
+        }
+
+        // Only update segments
+        // whose text changed.
+        const changedSegments =
+          meeting.transcript_segments.filter(
+            (segment) =>
+              (
+                editedTranscript[
+                  segment.id
+                ] ??
+                segment.text
+              ).trim() !==
+              segment.text
+          );
+
+        if (
+          changedSegments.length ===
+          0
+        ) {
+          setEditedTranscript(
+            {}
+          );
+
+          setIsEditingTranscript(
+            false
+          );
+
+          return;
+        }
+
+        const updatedSegments =
+          await Promise.all(
+            changedSegments.map(
+              (segment) =>
+                updateTranscriptSegment(
+                  segment.id,
+
+                  (
+                    editedTranscript[
+                      segment.id
+                    ] ??
+                    segment.text
+                  ).trim()
+                )
+            )
+          );
+
+        const updatedMap =
+          new Map(
+            updatedSegments.map(
+              (segment) => [
+                segment.id,
+                segment,
+              ]
+            )
+          );
+
+        setMeeting({
+          ...meeting,
+
+          transcript_segments:
+            meeting.transcript_segments.map(
+              (segment) =>
+                updatedMap.get(
+                  segment.id
+                ) ??
+                segment
+            ),
+        });
+
+        setEditedTranscript(
+          {}
+        );
+
+        setIsEditingTranscript(
+          false
+        );
+      } catch (err) {
+        console.error(err);
+
+        setTranscriptEditError(
+          "Could not save transcript changes."
+        );
+      } finally {
+        setSavingTranscript(
+          false
+        );
+      }
+    };
+
+  // ============================================================
+  // UI
+  // ============================================================
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#121212] text-[#ededed]">
-      {/* Meeting Header */}
+      {/* Meeting header */}
       <header className="flex h-[72px] shrink-0 items-center border-b border-[#292929] bg-[#171717] px-5">
         <button
           type="button"
           onClick={() =>
-            router.push("/meetings")
+            router.push(
+              "/meetings"
+            )
           }
           aria-label="Back to meetings"
           className="mr-3 flex h-9 w-9 items-center justify-center rounded-md text-[#aaa] transition-colors hover:bg-[#292929] hover:text-white"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft
+            size={18}
+          />
         </button>
 
         <div className="flex min-w-0 items-center gap-3">
@@ -330,15 +881,22 @@ export default function MeetingPage({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="max-w-[430px] truncate text-[16px] font-semibold">
-                {meeting.title}
+                {
+                  meeting.title
+                }
               </h1>
 
               <button
                 type="button"
+                onClick={
+                  handleRenameMeeting
+                }
                 aria-label="Edit meeting title"
                 className="text-[#777] hover:text-white"
               >
-                <Edit3 size={14} />
+                <Edit3
+                  size={14}
+                />
               </button>
             </div>
 
@@ -349,7 +907,9 @@ export default function MeetingPage({
                 )}
               </span>
 
-              <span>•</span>
+              <span>
+                •
+              </span>
 
               <span>
                 {formatDuration(
@@ -365,7 +925,10 @@ export default function MeetingPage({
             type="button"
             className="hidden h-9 items-center gap-2 rounded-md border border-[#343434] px-3 text-sm text-[#bbb] transition-colors hover:bg-[#242424] hover:text-white md:flex"
           >
-            <Share2 size={15} />
+            <Share2
+              size={15}
+            />
+
             Share
           </button>
 
@@ -374,7 +937,9 @@ export default function MeetingPage({
             aria-label="Download meeting"
             className="flex h-9 w-9 items-center justify-center rounded-md border border-[#343434] text-[#aaa] hover:bg-[#242424] hover:text-white"
           >
-            <Download size={16} />
+            <Download
+              size={16}
+            />
           </button>
 
           <button
@@ -382,14 +947,19 @@ export default function MeetingPage({
             aria-label="More meeting actions"
             className="flex h-9 w-9 items-center justify-center rounded-md border border-[#343434] text-[#aaa] hover:bg-[#242424] hover:text-white"
           >
-            <MoreHorizontal size={18} />
+            <MoreHorizontal
+              size={18}
+            />
           </button>
         </div>
       </header>
 
       {/* Main workspace */}
       <main className="flex min-h-0 flex-1 overflow-hidden">
-        {/* AI Notes */}
+        {/* ====================================================
+            AI NOTES
+        ==================================================== */}
+
         <section className="flex w-[48%] min-w-0 flex-col border-r border-[#292929] bg-[#121212]">
           <div className="flex h-[58px] shrink-0 items-center justify-between border-b border-[#292929] px-6">
             <div className="flex items-center gap-2">
@@ -408,14 +978,20 @@ export default function MeetingPage({
               className="flex items-center gap-1 text-xs text-[#888] hover:text-white"
             >
               General
-              <ChevronDown size={14} />
+
+              <ChevronDown
+                size={14}
+              />
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto px-7 py-6">
+            {/* Overview */}
             <NotesSection
               icon={
-                <FileText size={17} />
+                <FileText
+                  size={17}
+                />
               }
               title="Overview"
             >
@@ -426,17 +1002,113 @@ export default function MeetingPage({
               </p>
             </NotesSection>
 
+            {/* Action Items */}
             <NotesSection
               icon={
-                <ListChecks size={17} />
+                <ListChecks
+                  size={17}
+                />
               }
               title="Action items"
             >
-              {meeting.action_items
-                .length > 0 ? (
+              <div className="mb-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowAddAction(
+                      (
+                        previous
+                      ) =>
+                        !previous
+                    )
+                  }
+                  className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[#a98cff] transition-colors hover:bg-[#211c2e]"
+                >
+                  <Plus
+                    size={14}
+                  />
+
+                  Add action item
+                </button>
+              </div>
+
+              {showAddAction && (
+                <div className="mb-3 rounded-lg border border-[#393939] bg-[#181818] p-3">
+                  <textarea
+                    value={
+                      newActionText
+                    }
+                    onChange={(
+                      event
+                    ) =>
+                      setNewActionText(
+                        event
+                          .target
+                          .value
+                      )
+                    }
+                    placeholder="Add an action item..."
+                    rows={2}
+                    autoFocus
+                    className="w-full resize-none bg-transparent text-[13px] leading-5 text-white outline-none placeholder:text-[#666]"
+                  />
+
+                  <div className="mt-3 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddAction(
+                          false
+                        );
+
+                        setNewActionText(
+                          ""
+                        );
+                      }}
+                      className="flex h-8 items-center gap-1 rounded-md px-3 text-xs text-[#999] hover:bg-[#292929] hover:text-white"
+                    >
+                      <X
+                        size={
+                          13
+                        }
+                      />
+
+                      Cancel
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={
+                        handleCreateActionItem
+                      }
+                      disabled={
+                        !newActionText.trim()
+                      }
+                      className="h-8 rounded-md bg-[#6d32e9] px-3 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {actionError && (
+                <p className="mb-3 text-xs text-red-400">
+                  {
+                    actionError
+                  }
+                </p>
+              )}
+
+              {meeting
+                .action_items
+                .length >
+              0 ? (
                 <div className="space-y-3">
                   {meeting.action_items.map(
-                    (actionItem) => (
+                    (
+                      actionItem
+                    ) => (
                       <ActionItemRow
                         key={
                           actionItem.id
@@ -444,39 +1116,14 @@ export default function MeetingPage({
                         actionItem={
                           actionItem
                         }
-                      />
-                    )
-                  )}
-                </div>
-              ) : (
-                <EmptyText>
-                  No action items were
-                  identified.
-                </EmptyText>
-              )}
-            </NotesSection>
-
-            <NotesSection
-              icon={<Clock3 size={17} />}
-              title="Meeting outline"
-            >
-              {meeting.chapters.length >
-              0 ? (
-                <div className="space-y-1">
-                  {meeting.chapters.map(
-                    (chapter) => (
-                      <ChapterRow
-                        key={chapter.id}
-                        chapter={chapter}
-                        onSeek={seekTo}
-                        active={
-                          currentTime >=
-                            chapter.start_time &&
-                          isCurrentChapter(
-                            meeting.chapters,
-                            chapter,
-                            currentTime
-                          )
+                        onToggle={
+                          handleToggleActionItem
+                        }
+                        onEdit={
+                          handleEditActionItem
+                        }
+                        onDelete={
+                          handleDeleteActionItem
                         }
                       />
                     )
@@ -484,16 +1131,64 @@ export default function MeetingPage({
                 </div>
               ) : (
                 <EmptyText>
-                  No meeting chapters are
+                  No action items
+                  were identified.
+                </EmptyText>
+              )}
+            </NotesSection>
+
+            {/* Meeting Outline */}
+            <NotesSection
+              icon={
+                <Clock3
+                  size={17}
+                />
+              }
+              title="Meeting outline"
+            >
+              {meeting.chapters
+                .length >
+              0 ? (
+                <div className="space-y-1">
+                  {meeting.chapters.map(
+                    (
+                      chapter
+                    ) => (
+                      <ChapterRow
+                        key={
+                          chapter.id
+                        }
+                        chapter={
+                          chapter
+                        }
+                        onSeek={
+                          seekTo
+                        }
+                        active={isCurrentChapter(
+                          meeting.chapters,
+                          chapter,
+                          currentTime
+                        )}
+                      />
+                    )
+                  )}
+                </div>
+              ) : (
+                <EmptyText>
+                  No meeting
+                  chapters are
                   available.
                 </EmptyText>
               )}
             </NotesSection>
 
+            {/* Participants */}
             <NotesSection title="Participants">
               <div className="flex flex-wrap gap-2">
                 {meeting.participants.map(
-                  (participant) => (
+                  (
+                    participant
+                  ) => (
                     <div
                       key={
                         participant.id
@@ -526,11 +1221,17 @@ export default function MeetingPage({
           </div>
         </section>
 
-        {/* Transcript */}
+        {/* ====================================================
+            TRANSCRIPT
+        ==================================================== */}
+
         <section className="flex min-w-0 flex-1 flex-col bg-[#141414]">
+          {/* Transcript Header */}
           <div className="flex h-[58px] shrink-0 items-center justify-between border-b border-[#292929] px-5">
             <div className="flex items-center gap-2">
-              <FileText size={17} />
+              <FileText
+                size={17}
+              />
 
               <span className="text-[14px] font-medium">
                 Transcript
@@ -545,16 +1246,57 @@ export default function MeetingPage({
               </span>
             </div>
 
-            <button
-              type="button"
-              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-[#999] hover:bg-[#252525] hover:text-white"
-            >
-              <Edit3 size={14} />
-              Edit
-            </button>
+            {/* Edit / Save controls */}
+            <div className="flex items-center gap-2">
+              {isEditingTranscript ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={
+                      handleCancelTranscriptEdit
+                    }
+                    disabled={
+                      savingTranscript
+                    }
+                    className="rounded-md px-3 py-1.5 text-xs text-[#999] hover:bg-[#252525] hover:text-white disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={
+                      handleSaveTranscript
+                    }
+                    disabled={
+                      savingTranscript
+                    }
+                    className="rounded-md bg-[#6d32e9] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#7b42ef] disabled:opacity-50"
+                  >
+                    {savingTranscript
+                      ? "Saving..."
+                      : "Save"}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={
+                    handleStartTranscriptEdit
+                  }
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-[#999] hover:bg-[#252525] hover:text-white"
+                >
+                  <Edit3
+                    size={14}
+                  />
+
+                  Edit
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Search */}
+          {/* Transcript Search */}
           <div className="border-b border-[#292929] p-4">
             <div className="flex h-9 items-center gap-2 rounded-md border border-[#333] bg-[#1a1a1a] px-3">
               <Search
@@ -564,36 +1306,59 @@ export default function MeetingPage({
 
               <input
                 type="text"
-                value={transcriptSearch}
-                onChange={(event) =>
+                value={
+                  transcriptSearch
+                }
+                onChange={(
+                  event
+                ) =>
                   setTranscriptSearch(
-                    event.target.value
+                    event.target
+                      .value
                   )
                 }
                 placeholder="Search transcript"
-                className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[#777]"
+                disabled={
+                  isEditingTranscript
+                }
+                className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[#777] disabled:opacity-50"
               />
 
-              {transcriptSearch && (
-                <span className="text-[11px] text-[#777]">
-                  {
-                    filteredTranscript.length
-                  }{" "}
-                  matches
-                </span>
-              )}
+              {transcriptSearch &&
+                !isEditingTranscript && (
+                  <span className="text-[11px] text-[#777]">
+                    {
+                      filteredTranscript.length
+                    }{" "}
+                    matches
+                  </span>
+                )}
             </div>
           </div>
 
-          {/* Transcript rows */}
+          {transcriptEditError && (
+            <div className="border-b border-[#292929] px-5 py-2 text-xs text-red-400">
+              {
+                transcriptEditError
+              }
+            </div>
+          )}
+
+          {/* Transcript Rows */}
           <div className="flex-1 overflow-y-auto px-5 py-3">
             {filteredTranscript.length >
             0 ? (
               filteredTranscript.map(
-                (segment) => (
+                (
+                  segment
+                ) => (
                   <TranscriptRow
-                    key={segment.id}
-                    segment={segment}
+                    key={
+                      segment.id
+                    }
+                    segment={
+                      segment
+                    }
                     search={
                       transcriptSearch
                     }
@@ -601,38 +1366,72 @@ export default function MeetingPage({
                       activeSegment?.id ===
                       segment.id
                     }
-                    onSeek={seekTo}
+                    onSeek={
+                      seekTo
+                    }
+                    editing={
+                      isEditingTranscript
+                    }
+                    editedText={
+                      editedTranscript[
+                        segment.id
+                      ] ??
+                      segment.text
+                    }
+                    onTextChange={(
+                      text
+                    ) =>
+                      setEditedTranscript(
+                        (
+                          current
+                        ) => ({
+                          ...current,
+
+                          [segment.id]:
+                            text,
+                        })
+                      )
+                    }
                     elementRef={(
                       element
                     ) => {
                       transcriptRefs.current[
                         segment.id
-                      ] = element;
+                      ] =
+                        element;
                     }}
                   />
                 )
               )
             ) : (
               <div className="py-16 text-center text-sm text-[#777]">
-                No transcript matches
-                found.
+                No transcript
+                matches found.
               </div>
             )}
           </div>
         </section>
       </main>
 
-      {/* Player */}
+      {/* ======================================================
+          PLAYER
+      ====================================================== */}
+
       <footer className="flex h-[72px] shrink-0 items-center border-t border-[#292929] bg-[#181818] px-6">
         <button
           type="button"
-          onClick={togglePlayback}
+          onClick={
+            togglePlayback
+          }
+          disabled={
+            isEditingTranscript
+          }
           aria-label={
             isPlaying
               ? "Pause recording"
               : "Play recording"
           }
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#6d32e9] text-white transition-colors hover:bg-[#7c45ee]"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#6d32e9] text-white transition-colors hover:bg-[#7c45ee] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isPlaying ? (
             <Pause
@@ -654,8 +1453,6 @@ export default function MeetingPage({
           )}
         </span>
 
-        {/* Native range input gives us
-            click + drag seeking */}
         <div className="relative mx-3 flex flex-1 items-center">
           <div className="pointer-events-none absolute left-0 right-0 h-1 overflow-hidden rounded-full bg-[#383838]">
             <div
@@ -673,10 +1470,17 @@ export default function MeetingPage({
               meeting.duration_seconds
             }
             step={0.1}
-            value={currentTime}
-            onChange={handleSeek}
+            value={
+              currentTime
+            }
+            onChange={
+              handleSeek
+            }
+            disabled={
+              isEditingTranscript
+            }
             aria-label="Meeting progress"
-            className="relative z-10 h-5 w-full cursor-pointer opacity-0"
+            className="relative z-10 h-5 w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
           />
         </div>
 
@@ -696,6 +1500,10 @@ export default function MeetingPage({
     </div>
   );
 }
+
+// ============================================================
+// Notes Section
+// ============================================================
 
 function NotesSection({
   icon,
@@ -723,26 +1531,56 @@ function NotesSection({
   );
 }
 
+// ============================================================
+// Action Item
+// ============================================================
+
 function ActionItemRow({
   actionItem,
+  onToggle,
+  onEdit,
+  onDelete,
 }: {
   actionItem: ActionItem;
+
+  onToggle: (
+    actionItem: ActionItem
+  ) => void;
+
+  onEdit: (
+    actionItem: ActionItem
+  ) => void;
+
+  onDelete: (
+    actionItem: ActionItem
+  ) => void;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-[#2d2d2d] bg-[#181818] p-3">
+    <div className="group flex items-start gap-3 rounded-lg border border-[#2d2d2d] bg-[#181818] p-3">
       <button
         type="button"
-        aria-label="Complete action item"
-        className={`mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border ${
+        onClick={() =>
+          onToggle(
+            actionItem
+          )
+        }
+        aria-label={
+          actionItem.is_completed
+            ? "Mark action item incomplete"
+            : "Mark action item complete"
+        }
+        className={`mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border transition-colors ${
           actionItem.is_completed
             ? "border-[#7651df] bg-[#7651df] text-white"
-            : "border-[#555] text-transparent"
+            : "border-[#555] text-transparent hover:border-[#8b6de0]"
         }`}
       >
-        <Check size={12} />
+        <Check
+          size={12}
+        />
       </button>
 
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p
           className={`text-[13px] leading-5 ${
             actionItem.is_completed
@@ -750,21 +1588,59 @@ function ActionItemRow({
               : "text-[#cfcfcf]"
           }`}
         >
-          {actionItem.text}
+          {
+            actionItem.text
+          }
         </p>
 
         {actionItem.assignee && (
           <div className="mt-1.5 text-[11px] text-[#777]">
             {
-              actionItem.assignee
-                .name
+              actionItem
+                .assignee.name
             }
           </div>
         )}
       </div>
+
+      <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <button
+          type="button"
+          onClick={() =>
+            onEdit(
+              actionItem
+            )
+          }
+          aria-label="Edit action item"
+          className="flex h-7 w-7 items-center justify-center rounded text-[#777] hover:bg-[#292929] hover:text-white"
+        >
+          <Pencil
+            size={13}
+          />
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            onDelete(
+              actionItem
+            )
+          }
+          aria-label="Delete action item"
+          className="flex h-7 w-7 items-center justify-center rounded text-[#777] hover:bg-[#382020] hover:text-red-400"
+        >
+          <Trash2
+            size={13}
+          />
+        </button>
+      </div>
     </div>
   );
 }
+
+// ============================================================
+// Chapter
+// ============================================================
 
 function ChapterRow({
   chapter,
@@ -772,14 +1648,20 @@ function ChapterRow({
   active,
 }: {
   chapter: Chapter;
-  onSeek: (seconds: number) => void;
+
+  onSeek: (
+    seconds: number
+  ) => void;
+
   active: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={() =>
-        onSeek(chapter.start_time)
+        onSeek(
+          chapter.start_time
+        )
       }
       className={`flex w-full gap-4 rounded-md px-2 py-3 text-left transition-colors ${
         active
@@ -801,12 +1683,16 @@ function ChapterRow({
 
       <div>
         <div className="text-[13px] font-medium text-[#d7d7d7]">
-          {chapter.title}
+          {
+            chapter.title
+          }
         </div>
 
         {chapter.summary && (
           <div className="mt-1 text-xs leading-5 text-[#777]">
-            {chapter.summary}
+            {
+              chapter.summary
+            }
           </div>
         )}
       </div>
@@ -814,33 +1700,74 @@ function ChapterRow({
   );
 }
 
+// ============================================================
+// Transcript Row
+// ============================================================
+
 function TranscriptRow({
   segment,
   search,
   active,
   onSeek,
+  editing,
+  editedText,
+  onTextChange,
   elementRef,
 }: {
   segment: TranscriptSegment;
+
   search: string;
+
   active: boolean;
-  onSeek: (seconds: number) => void;
+
+  onSeek: (
+    seconds: number
+  ) => void;
+
+  editing: boolean;
+
+  editedText: string;
+
+  onTextChange: (
+    text: string
+  ) => void;
+
   elementRef: (
-    element: HTMLDivElement | null
+    element:
+      HTMLDivElement | null
   ) => void;
 }) {
   return (
     <div
-      ref={elementRef}
-      role="button"
-      tabIndex={0}
-      onClick={() =>
-        onSeek(segment.start_time)
+      ref={
+        elementRef
       }
-      onKeyDown={(event) => {
+      role={
+        editing
+          ? undefined
+          : "button"
+      }
+      tabIndex={
+        editing
+          ? undefined
+          : 0
+      }
+      onClick={() => {
+        if (!editing) {
+          onSeek(
+            segment.start_time
+          );
+        }
+      }}
+      onKeyDown={(
+        event
+      ) => {
         if (
-          event.key === "Enter" ||
-          event.key === " "
+          !editing &&
+          (event.key ===
+            "Enter" ||
+            event.key ===
+              " ")
         ) {
           event.preventDefault();
 
@@ -849,17 +1776,20 @@ function TranscriptRow({
           );
         }
       }}
-      className={`group flex cursor-pointer gap-4 rounded-lg border px-3 py-4 transition-colors ${
-        active
-          ? "border-[#59418c] bg-[#211b2e]"
-          : "border-transparent hover:bg-[#1c1c1c]"
+      className={`group flex gap-4 rounded-lg border px-3 py-4 transition-colors ${
+        editing
+          ? "border-[#323232] bg-[#171717]"
+          : active
+            ? "cursor-pointer border-[#59418c] bg-[#211b2e]"
+            : "cursor-pointer border-transparent hover:bg-[#1c1c1c]"
       }`}
     >
       <span
         className={`w-[46px] shrink-0 pt-1 text-left text-[11px] ${
-          active
+          active &&
+          !editing
             ? "text-[#ad91ff]"
-            : "text-[#777] group-hover:text-[#9c7bf4]"
+            : "text-[#777]"
         }`}
       >
         {formatPlayerTime(
@@ -873,14 +1803,16 @@ function TranscriptRow({
             className="flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold text-white"
             style={{
               backgroundColor:
-                segment.speaker
+                segment
+                  .speaker
                   ?.avatar_color ||
                 "#555555",
             }}
           >
             {segment.speaker
               ? getInitials(
-                  segment.speaker
+                  segment
+                    .speaker
                     .name
                 )
               : "?"}
@@ -888,33 +1820,66 @@ function TranscriptRow({
 
           <span
             className={`text-[12px] font-medium ${
-              active
+              active &&
+              !editing
                 ? "text-white"
                 : "text-[#bdbdbd]"
             }`}
           >
-            {segment.speaker
+            {segment
+              .speaker
               ?.name ||
               "Unknown speaker"}
           </span>
         </div>
 
-        <p
-          className={`text-[14px] leading-6 ${
-            active
-              ? "text-[#ededed]"
-              : "text-[#c8c8c8]"
-          }`}
-        >
-          <HighlightedText
-            text={segment.text}
-            search={search}
+        {editing ? (
+          <textarea
+            value={
+              editedText
+            }
+            onChange={(
+              event
+            ) =>
+              onTextChange(
+                event.target
+                  .value
+              )
+            }
+            onClick={(
+              event
+            ) =>
+              event.stopPropagation()
+            }
+            rows={3}
+            className="w-full resize-y rounded-md border border-[#3a3a3a] bg-[#181818] p-2.5 text-[14px] leading-6 text-white outline-none focus:border-[#7651df]"
           />
-        </p>
+        ) : (
+          <p
+            className={`text-[14px] leading-6 ${
+              active
+                ? "text-[#ededed]"
+                : "text-[#c8c8c8]"
+            }`}
+          >
+            <HighlightedText
+              text={
+                segment.text
+              }
+              search={
+                search
+              }
+            />
+          </p>
+        )}
       </div>
     </div>
   );
 }
+
+// ============================================================
+// Search Highlight
+// ============================================================
 
 function HighlightedText({
   text,
@@ -923,10 +1888,13 @@ function HighlightedText({
   text: string;
   search: string;
 }) {
-  const query = search.trim();
+  const query =
+    search.trim();
 
   if (!query) {
-    return <>{text}</>;
+    return (
+      <>{text}</>
+    );
   }
 
   const escaped =
@@ -935,10 +1903,11 @@ function HighlightedText({
       "\\$&"
     );
 
-  const regex = new RegExp(
-    `(${escaped})`,
-    "gi"
-  );
+  const regex =
+    new RegExp(
+      `(${escaped})`,
+      "gi"
+    );
 
   const parts =
     text.split(regex);
@@ -946,18 +1915,31 @@ function HighlightedText({
   return (
     <>
       {parts.map(
-        (part, index) =>
+        (
+          part,
+          index
+        ) =>
           part.toLowerCase() ===
           query.toLowerCase() ? (
             <mark
-              key={index}
+              key={
+                index
+              }
               className="rounded-sm bg-[#7052c8] px-0.5 text-white"
             >
-              {part}
+              {
+                part
+              }
             </mark>
           ) : (
-            <span key={index}>
-              {part}
+            <span
+              key={
+                index
+              }
+            >
+              {
+                part
+              }
             </span>
           )
       )}
@@ -965,10 +1947,15 @@ function HighlightedText({
   );
 }
 
+// ============================================================
+// Empty State
+// ============================================================
+
 function EmptyText({
   children,
 }: {
-  children: React.ReactNode;
+  children:
+    React.ReactNode;
 }) {
   return (
     <p className="text-sm text-[#777]">
@@ -977,16 +1964,25 @@ function EmptyText({
   );
 }
 
+// ============================================================
+// Loading
+// ============================================================
+
 function MeetingLoading() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#121212] text-[#999]">
       <div className="flex items-center gap-3">
         <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#444] border-t-[#8c66ef]" />
+
         Loading meeting...
       </div>
     </div>
   );
 }
+
+// ============================================================
+// Helpers
+// ============================================================
 
 function isCurrentChapter(
   chapters: Chapter[],
@@ -996,11 +1992,14 @@ function isCurrentChapter(
   const index =
     chapters.findIndex(
       (item) =>
-        item.id === chapter.id
+        item.id ===
+        chapter.id
     );
 
   const nextChapter =
-    chapters[index + 1];
+    chapters[
+      index + 1
+    ];
 
   if (!nextChapter) {
     return (
@@ -1023,7 +2022,10 @@ function getInitials(
   return name
     .split(" ")
     .filter(Boolean)
-    .map((part) => part[0])
+    .map(
+      (part) =>
+        part[0]
+    )
     .join("")
     .slice(0, 2)
     .toUpperCase();
@@ -1035,27 +2037,40 @@ function formatMeetingDate(
   return new Intl.DateTimeFormat(
     "en-US",
     {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
+      month:
+        "short",
+      day:
+        "numeric",
+      year:
+        "numeric",
+      hour:
+        "numeric",
+      minute:
+        "2-digit",
     }
-  ).format(new Date(value));
+  ).format(
+    new Date(value)
+  );
 }
 
 function formatDuration(
   seconds: number
 ) {
   const minutes =
-    Math.floor(seconds / 60);
+    Math.floor(
+      seconds / 60
+    );
 
-  if (minutes < 60) {
+  if (
+    minutes < 60
+  ) {
     return `${minutes} min`;
   }
 
   const hours =
-    Math.floor(minutes / 60);
+    Math.floor(
+      minutes / 60
+    );
 
   const remainingMinutes =
     minutes % 60;
@@ -1067,11 +2082,14 @@ function formatPlayerTime(
   seconds: number
 ) {
   const totalSeconds =
-    Math.floor(seconds);
+    Math.floor(
+      seconds
+    );
 
   const minutes =
     Math.floor(
-      totalSeconds / 60
+      totalSeconds /
+        60
     );
 
   const remainingSeconds =
@@ -1079,5 +2097,8 @@ function formatPlayerTime(
 
   return `${minutes}:${remainingSeconds
     .toString()
-    .padStart(2, "0")}`;
+    .padStart(
+      2,
+      "0"
+    )}`;
 }

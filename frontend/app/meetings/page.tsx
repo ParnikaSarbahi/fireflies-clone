@@ -6,24 +6,101 @@ import {
   Calendar,
   ChevronDown,
   Filter,
-  MoreHorizontal,
   Search,
-  SlidersHorizontal,
+  SlidersHorizontal,Plus
 } from "lucide-react";
+
+import CreateMeetingModal from "../../components/meetings/CreateMeetingModal";
 
 import Sidebar from "../../components/layout/Sidebar";
 import Topbar from "../../components/layout/Topbar";
-import { getMeetings } from "../../lib/api";
+import {
+  deleteMeeting,
+  getMeetings,
+  updateMeeting,
+} from "../../lib/api";
 import type { Meeting } from "../../lib/types";
+import MeetingActions from "../../components/meetings/MeetingActions";
 
 export default function MeetingsPage() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [search, setSearch] = useState("");
   const [participant, setParticipant] = useState("");
   const [meetingDate, setMeetingDate] = useState("");
+  const [showCreateMeeting, setShowCreateMeeting] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const handleRenameMeeting = async (
+      meeting: Meeting
+    ) => {
+      const newTitle = window.prompt(
+        "Rename meeting",
+        meeting.title
+      );
+
+      if (newTitle === null) {
+        return;
+      }
+
+      const cleanedTitle = newTitle.trim();
+
+      if (
+        !cleanedTitle ||
+        cleanedTitle === meeting.title
+      ) {
+        return;
+      }
+
+      try {
+        const updated = await updateMeeting(
+          meeting.id,
+          {
+            title: cleanedTitle,
+          }
+        );
+
+        setMeetings((current) =>
+          current.map((item) =>
+            item.id === meeting.id
+              ? {
+                  ...item,
+                  title: updated.title,
+                }
+              : item
+          )
+        );
+      } catch (err) {
+        console.error(err);
+        window.alert("Could not rename meeting.");
+      }
+    };
+
+
+    const handleDeleteMeeting = async (
+      meeting: Meeting
+    ) => {
+      const confirmed = window.confirm(
+        `Delete "${meeting.title}"?\n\nThis will also delete its transcript, summary and action items.`
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        await deleteMeeting(meeting.id);
+
+        setMeetings((current) =>
+          current.filter(
+            (item) => item.id !== meeting.id
+          )
+        );
+      } catch (err) {
+        console.error(err);
+        window.alert("Could not delete meeting.");
+      }
+    };
 
   useEffect(() => {
     const loadMeetings = async () => {
@@ -71,10 +148,11 @@ export default function MeetingsPage() {
 
             <button
               type="button"
-              className="flex h-10 items-center gap-2 rounded-md border border-[#343434] bg-[#1c1c1c] px-4 text-sm text-[#d4d4d4] transition-colors hover:bg-[#242424]"
+              onClick={() => setShowCreateMeeting(true)}
+              className="flex h-10 items-center gap-2 rounded-md bg-[#6d32e9] px-4 text-sm font-medium text-white transition-colors hover:bg-[#7b42ef]"
             >
-              <SlidersHorizontal size={16} />
-              Filters
+              <Plus size={16} />
+              New Meeting
             </button>
           </div>
 
@@ -173,7 +251,16 @@ export default function MeetingsPage() {
             {!loading &&
               !error &&
               meetings.map((meeting) => (
-                <MeetingRow key={meeting.id} meeting={meeting} />
+                <MeetingRow
+                key={meeting.id}
+                meeting={meeting}
+                onRename={() =>
+                  handleRenameMeeting(meeting)
+                }
+                onDelete={() =>
+                  handleDeleteMeeting(meeting)
+                }
+              />
               ))}
           </div>
         </div>
@@ -186,11 +273,36 @@ export default function MeetingsPage() {
       >
         ?
       </button>
+
+      {showCreateMeeting && (
+        <CreateMeetingModal
+          onClose={() => setShowCreateMeeting(false)}
+          onCreated={(createdMeeting) => {
+            setShowCreateMeeting(false);
+
+            setMeetings((current) =>
+              [createdMeeting, ...current].sort(
+                (a, b) =>
+                  new Date(b.meeting_date).getTime() -
+                  new Date(a.meeting_date).getTime()
+              )
+            );
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function MeetingRow({ meeting }: { meeting: Meeting }) {
+function MeetingRow({
+  meeting,
+  onRename,
+  onDelete,
+}: {
+  meeting: Meeting;
+  onRename: () => void;
+  onDelete: () => void;
+}) {
   const router = useRouter();
 
   const openMeeting = () => {
@@ -203,7 +315,10 @@ function MeetingRow({ meeting }: { meeting: Meeting }) {
       tabIndex={0}
       onClick={openMeeting}
       onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
+        if (
+          event.key === "Enter" ||
+          event.key === " "
+        ) {
           event.preventDefault();
           openMeeting();
         }
@@ -218,22 +333,33 @@ function MeetingRow({ meeting }: { meeting: Meeting }) {
         </div>
 
         <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-[13px] text-[#898989]">
-          <span>{formatMeetingDate(meeting.meeting_date)}</span>
+          <span>
+            {formatMeetingDate(
+              meeting.meeting_date
+            )}
+          </span>
+
           <span>•</span>
-          <span>{formatDuration(meeting.duration_seconds)}</span>
+
+          <span>
+            {formatDuration(
+              meeting.duration_seconds
+            )}
+          </span>
+
           <span>•</span>
-          <span>{formatParticipantNames(meeting)}</span>
+
+          <span>
+            {formatParticipantNames(meeting)}
+          </span>
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={(event) => event.stopPropagation()}
-        className="ml-4 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#777] opacity-0 transition-all hover:bg-[#303030] hover:text-white group-hover:opacity-100"
-        aria-label={`Actions for ${meeting.title}`}
-      >
-        <MoreHorizontal size={18} />
-      </button>
+      <MeetingActions
+        title={meeting.title}
+        onRename={onRename}
+        onDelete={onDelete}
+      />
     </div>
   );
 }

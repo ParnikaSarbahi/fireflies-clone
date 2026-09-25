@@ -64,3 +64,30 @@ class MeetingDetailResponse(MeetingListResponse):
     summary: SummaryResponse | None
     action_items: list[ActionItemResponse]
     chapters: list[ChapterResponse]
+
+class ActionItemCreate(BaseModel):
+    text: str
+    assignee_id: int | None = None
+
+
+class ActionItemUpdate(BaseModel):
+    text: str | None = None
+    assignee_id: int | None = None
+    is_completed: bool | None = None
+
+class MeetingCreate(BaseModel):
+    title: str
+    meeting_date: datetime
+    duration_seconds: int = 0
+    participant_names: list[str] = []
+    transcript_text: str | None = None
+
+
+class MeetingUpdate(BaseModel):
+    title: str | None = None
+    meeting_date: datetime | None = None
+    duration_seconds: int | None = None
+    participant_names: list[str] | None = None
+
+class TranscriptSegmentUpdate(BaseModel):
+    text: str    

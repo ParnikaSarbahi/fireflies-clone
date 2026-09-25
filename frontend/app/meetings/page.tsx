@@ -10,8 +10,6 @@ import {
   SlidersHorizontal,Plus
 } from "lucide-react";
 
-import CreateMeetingModal from "../../components/meetings/CreateMeetingModal";
-
 import Sidebar from "../../components/layout/Sidebar";
 import Topbar from "../../components/layout/Topbar";
 import {
@@ -20,7 +18,13 @@ import {
   updateMeeting,
 } from "../../lib/api";
 import type { Meeting } from "../../lib/types";
+
+import CreateMeetingModal from "../../components/meetings/CreateMeetingModal";
+import DeleteMeetingModal from "../../components/meetings/DeleteMeetingModal";
 import MeetingActions from "../../components/meetings/MeetingActions";
+import RenameMeetingModal from "../../components/meetings/RenameMeetingModal";
+import Toast from "../../components/ui/Toast";
+
 
 export default function MeetingsPage() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -29,78 +33,100 @@ export default function MeetingsPage() {
   const [meetingDate, setMeetingDate] = useState("");
   const [showCreateMeeting, setShowCreateMeeting] = useState(false);
 
+  const [meetingToRename, setMeetingToRename] =
+    useState<Meeting | null>(null);
+
+  const [meetingToDelete, setMeetingToDelete] =
+    useState<Meeting | null>(null);
+
+  const [deletingMeeting, setDeletingMeeting] =
+    useState(false);
+
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
+
+  const showToast = (
+    message: string,
+    type: "success" | "error" = "success"
+  ) => {
+    setToast({
+      message,
+      type,
+    });
+
+    window.setTimeout(() => {
+      setToast(null);
+    }, 3000);
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const handleRenameMeeting = async (
-      meeting: Meeting
-    ) => {
-      const newTitle = window.prompt(
-        "Rename meeting",
-        meeting.title
+    newTitle: string
+  ) => {
+    if (!meetingToRename) {
+      return;
+    }
+
+    const updated = await updateMeeting(
+      meetingToRename.id,
+      {
+        title: newTitle,
+      }
+    );
+
+    setMeetings((current) =>
+      current.map((meeting) =>
+        meeting.id === updated.id
+          ? {
+              ...meeting,
+              title: updated.title,
+            }
+          : meeting
+      )
+    );
+
+    setMeetingToRename(null);
+
+    showToast("Meeting renamed");
+  };
+
+
+    const handleDeleteMeeting = async () => {
+    if (!meetingToDelete) {
+      return;
+    }
+
+    try {
+      setDeletingMeeting(true);
+
+      const meetingId =
+        meetingToDelete.id;
+
+      await deleteMeeting(meetingId);
+
+      setMeetings((current) =>
+        current.filter(
+          (meeting) =>
+            meeting.id !== meetingId
+        )
       );
 
-      if (newTitle === null) {
-        return;
-      }
+      setMeetingToDelete(null);
 
-      const cleanedTitle = newTitle.trim();
+      showToast("Meeting deleted");
+    } catch (err) {
+      console.error(err);
 
-      if (
-        !cleanedTitle ||
-        cleanedTitle === meeting.title
-      ) {
-        return;
-      }
-
-      try {
-        const updated = await updateMeeting(
-          meeting.id,
-          {
-            title: cleanedTitle,
-          }
-        );
-
-        setMeetings((current) =>
-          current.map((item) =>
-            item.id === meeting.id
-              ? {
-                  ...item,
-                  title: updated.title,
-                }
-              : item
-          )
-        );
-      } catch (err) {
-        console.error(err);
-        window.alert("Could not rename meeting.");
-      }
-    };
-
-
-    const handleDeleteMeeting = async (
-      meeting: Meeting
-    ) => {
-      const confirmed = window.confirm(
-        `Delete "${meeting.title}"?\n\nThis will also delete its transcript, summary and action items.`
+      showToast(
+        "Could not delete meeting",
+        "error"
       );
-
-      if (!confirmed) {
-        return;
-      }
-
-      try {
-        await deleteMeeting(meeting.id);
-
-        setMeetings((current) =>
-          current.filter(
-            (item) => item.id !== meeting.id
-          )
-        );
-      } catch (err) {
-        console.error(err);
-        window.alert("Could not delete meeting.");
-      }
-    };
+    } finally {
+      setDeletingMeeting(false);
+    }
+  };
 
   useEffect(() => {
     const loadMeetings = async () => {
@@ -252,15 +278,15 @@ export default function MeetingsPage() {
               !error &&
               meetings.map((meeting) => (
                 <MeetingRow
-                key={meeting.id}
-                meeting={meeting}
-                onRename={() =>
-                  handleRenameMeeting(meeting)
-                }
-                onDelete={() =>
-                  handleDeleteMeeting(meeting)
-                }
-              />
+                  key={meeting.id}
+                  meeting={meeting}
+                  onRename={() =>
+                    setMeetingToRename(meeting)
+                  }
+                  onDelete={() =>
+                    setMeetingToDelete(meeting)
+                  }
+                />
               ))}
           </div>
         </div>
@@ -283,13 +309,60 @@ export default function MeetingsPage() {
             setMeetings((current) =>
               [createdMeeting, ...current].sort(
                 (a, b) =>
-                  new Date(b.meeting_date).getTime() -
-                  new Date(a.meeting_date).getTime()
+                  new Date(
+                    b.meeting_date
+                  ).getTime() -
+                  new Date(
+                    a.meeting_date
+                  ).getTime()
               )
             );
+
+            showToast("Meeting created");
           }}
         />
       )}
+
+      {meetingToRename && (
+        <RenameMeetingModal
+          currentTitle={
+            meetingToRename.title
+          }
+          onClose={() =>
+            setMeetingToRename(null)
+          }
+          onRename={
+            handleRenameMeeting
+          }
+        />
+      )}
+
+      {meetingToDelete && (
+        <DeleteMeetingModal
+          title={
+            meetingToDelete.title
+          }
+          deleting={
+            deletingMeeting
+          }
+          onClose={() =>
+            setMeetingToDelete(null)
+          }
+          onDelete={
+            handleDeleteMeeting
+          }
+        />
+      )}
+
+      {toast && (
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        onClose={() =>
+          setToast(null)
+        }
+      />
+    )}
     </div>
   );
 }

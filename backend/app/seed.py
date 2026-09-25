@@ -87,88 +87,227 @@ def reset_and_seed_database():
         # Transcript
         # -------------------------
 
-        transcript = [
-            TranscriptSegment(
-                meeting_id=meeting.id,
-                speaker_id=parnika.id,
-                start_time=0,
-                end_time=14,
-                sequence_number=1,
-                text=(
-                    "Good morning everyone. Let's start with the product "
-                    "updates and then go through the blockers for this week."
-                ),
+        transcript_data = [
+            # sequence, speaker, start, end, text
+            (
+                1,
+                parnika,
+                0,
+                75,
+                "Good morning everyone. Let's start with our weekly product sync. "
+                "Today I want to review engineering progress, the meeting library, "
+                "search and filtering, and everything we still need for Friday's customer demo.",
             ),
-            TranscriptSegment(
-                meeting_id=meeting.id,
-                speaker_id=rahul.id,
-                start_time=14,
-                end_time=32,
-                sequence_number=2,
-                text=(
-                    "The new dashboard API is almost complete. The meeting "
-                    "search endpoint is working, but I still need to finish "
-                    "participant filtering."
-                ),
+            (
+                2,
+                rahul,
+                75,
+                165,
+                "On the backend side, the main meeting APIs are working now. "
+                "We can list meetings, retrieve an individual meeting, and return the "
+                "participants, transcript, summary, chapters, and action items together.",
             ),
-            TranscriptSegment(
-                meeting_id=meeting.id,
-                speaker_id=ananya.id,
-                start_time=32,
-                end_time=49,
-                sequence_number=3,
-                text=(
-                    "The updated meeting library designs are ready. I also "
-                    "finished the empty states and the mobile layout."
-                ),
+            (
+                3,
+                ananya,
+                165,
+                255,
+                "The meeting library design is also in good shape. I simplified the "
+                "navigation, improved the spacing between meeting rows, and made the "
+                "participant information easier to scan without overcrowding the page.",
             ),
-            TranscriptSegment(
-                meeting_id=meeting.id,
-                speaker_id=parnika.id,
-                start_time=49,
-                end_time=66,
-                sequence_number=4,
-                text=(
-                    "Great. Let's prioritize participant filtering because "
-                    "we need it for the customer demo on Friday."
-                ),
+            (
+                4,
+                parnika,
+                255,
+                345,
+                "That sounds good. For the demo, the experience should feel fast and "
+                "focused. A user should be able to open the library, find a meeting, "
+                "and understand the important information without learning the interface first.",
             ),
-            TranscriptSegment(
-                meeting_id=meeting.id,
-                speaker_id=rahul.id,
-                start_time=66,
-                end_time=84,
-                sequence_number=5,
-                text=(
-                    "That works for me. I'll finish the filter endpoint "
-                    "today and add API tests before handing it over."
-                ),
+            (
+                5,
+                rahul,
+                345,
+                435,
+                "Search by meeting title is complete. I also added participant matching, "
+                "so searching for a person's name returns meetings they attended. "
+                "The endpoint still keeps the newest meetings first.",
             ),
-            TranscriptSegment(
-                meeting_id=meeting.id,
-                speaker_id=ananya.id,
-                start_time=84,
-                end_time=103,
-                sequence_number=6,
-                text=(
-                    "Once that's available I'll connect the filters to the "
-                    "frontend and verify the loading and empty states."
-                ),
+            (
+                6,
+                ananya,
+                435,
+                525,
+                "I'll connect those search states to the frontend. We should show a "
+                "loading state while the request is running and a clear empty state "
+                "when no meetings match the current query.",
             ),
-            TranscriptSegment(
-                meeting_id=meeting.id,
-                speaker_id=parnika.id,
-                start_time=103,
-                end_time=120,
-                sequence_number=7,
-                text=(
-                    "Perfect. I'll prepare the demo checklist and make sure "
-                    "we have everything ready before Friday."
-                ),
+            (
+                7,
+                parnika,
+                525,
+                615,
+                "Let's make sure filtering works independently as well. We need title "
+                "search, participant filtering, and date filtering. Combining them should "
+                "also work because someone may remember the attendee but not the meeting title.",
+            ),
+            (
+                8,
+                rahul,
+                615,
+                705,
+                "The query structure already supports that. Participant filtering joins "
+                "the participant relationship, while the date filter constrains the meeting "
+                "timestamp. I added distinct results so the joins don't duplicate meetings.",
+            ),
+            (
+                9,
+                ananya,
+                705,
+                795,
+                "For the detail view, I want to keep AI notes and the transcript visible "
+                "side by side. The notes panel can contain the overview, action items, "
+                "meeting outline, and participants while the transcript remains the primary reference.",
+            ),
+            (
+                10,
+                parnika,
+                795,
+                885,
+                "Agreed. The transcript interaction is especially important. Clicking a "
+                "transcript line should move playback to that timestamp, and playback should "
+                "visually indicate which transcript segment is currently active.",
+            ),
+            (
+                11,
+                rahul,
+                885,
+                975,
+                "We can use one current-time value as the source of truth. The player, "
+                "seek bar, transcript highlight, and chapter navigation can all derive their "
+                "state from that same value instead of maintaining separate synchronization logic.",
+            ),
+            (
+                12,
+                ananya,
+                975,
+                1065,
+                "That will also make the interface easier to reason about. I'll make the "
+                "active transcript segment visually distinct but subtle enough that the user "
+                "can continue reading surrounding lines.",
+            ),
+            (
+                13,
+                parnika,
+                1065,
+                1155,
+                "Let's cover editing as well. Meeting titles, action items, and transcript "
+                "text should persist after refresh. We don't need complicated collaborative "
+                "editing for this version, but the core CRUD workflow has to feel complete.",
+            ),
+            (
+                14,
+                rahul,
+                1155,
+                1245,
+                "Action item create, update, complete, and delete operations are straightforward. "
+                "I'll keep those endpoints separate from the meeting routes so the API stays "
+                "modular and each router has a clear responsibility.",
+            ),
+            (
+                15,
+                ananya,
+                1245,
+                1335,
+                "On the frontend I'll make the completed state immediately visible and "
+                "provide feedback after changes. We should avoid controls that look clickable "
+                "but don't actually do anything in the final demo.",
+            ),
+            (
+                16,
+                parnika,
+                1335,
+                1425,
+                "For meeting creation, let's keep the workflow simple. Users can enter "
+                "metadata and paste a transcript, or upload a text file. We don't need real "
+                "speech-to-text because that's explicitly outside the scope of this project.",
+            ),
+            (
+                17,
+                rahul,
+                1425,
+                1515,
+                "The transcript parser can treat each non-empty line as a segment. If the "
+                "line begins with a speaker name followed by a colon, we associate that segment "
+                "with the participant and generate simple timestamps.",
+            ),
+            (
+                18,
+                ananya,
+                1515,
+                1605,
+                "For the creation modal I'll clearly explain the speaker-colon-text format. "
+                "Uploading a text file can simply populate the same transcript field, which "
+                "keeps the frontend and backend implementation much smaller.",
+            ),
+            (
+                19,
+                parnika,
+                1605,
+                1695,
+                "The remaining concern is deployment. We already have the frontend and "
+                "backend hosted, so after the functionality is stable we should verify the "
+                "production API, seeded data, and the complete create-edit-delete journey.",
+            ),
+            (
+                20,
+                rahul,
+                1695,
+                1765,
+                "I'll also run the production build and API smoke tests before the final "
+                "submission. That should catch TypeScript issues or missing Python dependencies "
+                "that development mode might not expose.",
+            ),
+            (
+                21,
+                ananya,
+                1765,
+                1815,
+                "I'll do one final interface pass after that: spacing, empty states, modals, "
+                "notifications, and the placeholder experiences for integrations and live capture.",
+            ),
+            (
+                22,
+                parnika,
+                1815,
+                1845,
+                "Perfect. Rahul will finish the API and deployment checks, Ananya will do "
+                "the interface pass, and I'll prepare the customer demo checklist. "
+                "Let's have everything ready before Friday.",
             ),
         ]
 
+        transcript = [
+            TranscriptSegment(
+                meeting_id=meeting.id,
+                speaker_id=speaker.id,
+                start_time=start_time,
+                end_time=end_time,
+                text=text,
+                sequence_number=sequence_number,
+            )
+            for (
+                sequence_number,
+                speaker,
+                start_time,
+                end_time,
+                text,
+            ) in transcript_data
+        ]
+
         db.add_all(transcript)
+        
 
         # -------------------------
         # AI Summary
@@ -216,32 +355,80 @@ def reset_and_seed_database():
         # -------------------------
         # Chapters / Key Topics
         # -------------------------
-
         chapters = [
             Chapter(
                 meeting_id=meeting.id,
-                title="Product Updates",
+                title="Product & Engineering Updates",
                 start_time=0,
-                summary="The team shared progress across backend and design.",
+                summary=(
+                    "The team reviewed backend progress, the meeting library, "
+                    "and the priorities for the customer demo."
+                ),
                 sequence_number=1,
             ),
             Chapter(
                 meeting_id=meeting.id,
-                title="Participant Filtering",
-                start_time=49,
-                summary="Participant filtering was prioritized for the demo.",
+                title="Search & Filtering",
+                start_time=345,
+                summary=(
+                    "The team discussed title search, participant filtering, "
+                    "date filtering, and combined meeting queries."
+                ),
                 sequence_number=2,
             ),
             Chapter(
                 meeting_id=meeting.id,
-                title="Next Steps",
-                start_time=84,
-                summary="Owners agreed on tasks required before Friday.",
+                title="Transcript Experience",
+                start_time=705,
+                summary=(
+                    "The meeting detail layout and synchronized transcript "
+                    "playback experience were reviewed."
+                ),
                 sequence_number=3,
+            ),
+            Chapter(
+                meeting_id=meeting.id,
+                title="Editing & Action Items",
+                start_time=1065,
+                summary=(
+                    "The team reviewed persistent transcript editing, meeting "
+                    "metadata updates, and action item workflows."
+                ),
+                sequence_number=4,
+            ),
+            Chapter(
+                meeting_id=meeting.id,
+                title="Meeting Creation",
+                start_time=1335,
+                summary=(
+                    "The team agreed on a simple pasted transcript and text-file "
+                    "upload workflow for creating meetings."
+                ),
+                sequence_number=5,
+            ),
+            Chapter(
+                meeting_id=meeting.id,
+                title="Deployment & Final QA",
+                start_time=1605,
+                summary=(
+                    "Production deployment, build checks, UI polish, and final "
+                    "demo responsibilities were discussed."
+                ),
+                sequence_number=6,
+            ),
+            Chapter(
+                meeting_id=meeting.id,
+                title="Next Steps",
+                start_time=1815,
+                summary=(
+                    "Owners confirmed the final API, UI, deployment, and demo tasks."
+                ),
+                sequence_number=7,
             ),
         ]
 
         db.add_all(chapters)
+        
 
         # -------------------------
         # Additional seeded meetings

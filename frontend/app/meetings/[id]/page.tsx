@@ -43,6 +43,8 @@ import type {
   MeetingDetail,
   TranscriptSegment,
 } from "../../../lib/types";
+import RenameMeetingModal from "../../../components/meetings/RenameMeetingModal";
+import Toast from "../../../components/ui/Toast";
 
 type MeetingPageProps = {
   params: Promise<{
@@ -55,6 +57,23 @@ export default function MeetingPage({
 }: MeetingPageProps) {
   const { id } = use(params);
   const router = useRouter();
+  const [showRenameModal, setShowRenameModal] = useState(false);
+
+const [toast, setToast] = useState<{
+  message: string;
+  type: "success" | "error";
+} | null>(null);
+
+const showToast = (
+  message: string,
+  type: "success" | "error" = "success"
+) => {
+  setToast({ message, type });
+
+  window.setTimeout(() => {
+    setToast(null);
+  }, 3000);
+};
 
   // ============================================================
   // Meeting state
@@ -443,56 +462,25 @@ export default function MeetingPage({
   // Meeting rename
   // ============================================================
 
-  const handleRenameMeeting =
-    async () => {
-      if (!meeting) {
-        return;
-      }
+  const handleRenameMeeting = async (
+  newTitle: string
+) => {
+  if (!meeting) {
+    return;
+  }
 
-      const newTitle =
-        window.prompt(
-          "Rename meeting",
-          meeting.title
-        );
+  const updated = await updateMeeting(
+    meeting.id,
+    {
+      title: newTitle,
+    }
+  );
 
-      if (
-        newTitle === null
-      ) {
-        return;
-      }
+  setMeeting(updated);
+  setShowRenameModal(false);
 
-      const cleanedTitle =
-        newTitle.trim();
-
-      if (
-        !cleanedTitle ||
-        cleanedTitle ===
-          meeting.title
-      ) {
-        return;
-      }
-
-      try {
-        const updated =
-          await updateMeeting(
-            meeting.id,
-            {
-              title:
-                cleanedTitle,
-            }
-          );
-
-        setMeeting(
-          updated
-        );
-      } catch (err) {
-        console.error(err);
-
-        window.alert(
-          "Could not rename meeting."
-        );
-      }
-    };
+  showToast("Meeting renamed");
+};
 
   // ============================================================
   // Action item CRUD
@@ -526,6 +514,11 @@ export default function MeetingPage({
                   : item
             ),
         });
+        showToast(
+        updated.is_completed
+            ? "Action item completed"
+            : "Action item reopened"
+        );
       } catch (err) {
         console.error(err);
 
@@ -578,6 +571,7 @@ export default function MeetingPage({
           "Could not add action item."
         );
       }
+      showToast("Action item added");
     };
 
   const handleEditActionItem =
@@ -634,6 +628,7 @@ export default function MeetingPage({
           "Could not edit action item."
         );
       }
+      showToast("Action item updated");
     };
 
   const handleDeleteActionItem =
@@ -673,6 +668,7 @@ export default function MeetingPage({
           "Could not delete action item."
         );
       }
+      showToast("Action item deleted");
     };
 
   // ============================================================
@@ -848,6 +844,7 @@ export default function MeetingPage({
           false
         );
       }
+      showToast("Transcript updated");
     };
 
   // ============================================================
@@ -888,9 +885,7 @@ export default function MeetingPage({
 
               <button
                 type="button"
-                onClick={
-                  handleRenameMeeting
-                }
+                onClick={() => setShowRenameModal(true)}
                 aria-label="Edit meeting title"
                 className="text-[#777] hover:text-white"
               >
@@ -951,6 +946,26 @@ export default function MeetingPage({
               size={18}
             />
           </button>
+
+          {showRenameModal && (
+  <RenameMeetingModal
+    currentTitle={meeting.title}
+    onClose={() =>
+      setShowRenameModal(false)
+    }
+    onRename={handleRenameMeeting}
+  />
+)}
+
+{toast && (
+  <Toast
+    message={toast.message}
+    type={toast.type}
+    onClose={() => setToast(null)}
+  />
+)}
+
+          
         </div>
       </header>
 

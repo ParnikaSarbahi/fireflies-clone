@@ -18,21 +18,6 @@ The application recreates the core post-meeting workflow of Fireflies: users can
 
 > The backend is hosted on Render's free tier, so the first request after a period of inactivity may take a short time while the service wakes up.
 
-
-### Meetings Library
-
-```md
-![Meetings Library](docs/screenshots/meetings.png)
-```
-
-### Meeting Notepad
-
-```md
-![Meeting Notepad](docs/screenshots/notepad.png)
-```
-
----
-
 ## Features
 
 ### Meetings Library

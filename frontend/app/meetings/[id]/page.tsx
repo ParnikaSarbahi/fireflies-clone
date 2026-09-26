@@ -1,12 +1,8 @@
 "use client";
 
-import {
-  use,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+
 import {
   ArrowLeft,
   Check,
@@ -43,7 +39,9 @@ import type {
   MeetingDetail,
   TranscriptSegment,
 } from "../../../lib/types";
+
 import RenameMeetingModal from "../../../components/meetings/RenameMeetingModal";
+import ComingSoonModal from "../../../components/ui/ComingSoonModal";
 import Toast from "../../../components/ui/Toast";
 
 type MeetingPageProps = {
@@ -52,31 +50,19 @@ type MeetingPageProps = {
   }>;
 };
 
+type ToastState = {
+  message: string;
+  type: "success" | "error";
+};
+
 export default function MeetingPage({
   params,
 }: MeetingPageProps) {
   const { id } = use(params);
   const router = useRouter();
-  const [showRenameModal, setShowRenameModal] = useState(false);
-
-const [toast, setToast] = useState<{
-  message: string;
-  type: "success" | "error";
-} | null>(null);
-
-const showToast = (
-  message: string,
-  type: "success" | "error" = "success"
-) => {
-  setToast({ message, type });
-
-  window.setTimeout(() => {
-    setToast(null);
-  }, 3000);
-};
 
   // ============================================================
-  // Meeting state
+  // Meeting
   // ============================================================
 
   const [meeting, setMeeting] =
@@ -89,7 +75,29 @@ const showToast = (
     useState("");
 
   // ============================================================
-  // Transcript state
+  // UI
+  // ============================================================
+
+  const [
+    showRenameModal,
+    setShowRenameModal,
+  ] = useState(false);
+
+  const [
+    comingSoonFeature,
+    setComingSoonFeature,
+  ] = useState<string | null>(null);
+
+  const [
+    showExportMenu,
+    setShowExportMenu,
+  ] = useState(false);
+
+  const [toast, setToast] =
+    useState<ToastState | null>(null);
+
+  // ============================================================
+  // Transcript
   // ============================================================
 
   const [
@@ -105,9 +113,7 @@ const showToast = (
   const [
     editedTranscript,
     setEditedTranscript,
-  ] = useState<
-    Record<number, string>
-  >({});
+  ] = useState<Record<number, string>>({});
 
   const [
     savingTranscript,
@@ -120,18 +126,14 @@ const showToast = (
   ] = useState("");
 
   // ============================================================
-  // Player state
+  // Player
   // ============================================================
 
-  const [
-    currentTime,
-    setCurrentTime,
-  ] = useState(0);
+  const [currentTime, setCurrentTime] =
+    useState(0);
 
-  const [
-    isPlaying,
-    setIsPlaying,
-  ] = useState(false);
+  const [isPlaying, setIsPlaying] =
+    useState(false);
 
   const playbackStartRef =
     useRef<number | null>(null);
@@ -141,14 +143,11 @@ const showToast = (
 
   const transcriptRefs =
     useRef<
-      Record<
-        number,
-        HTMLDivElement | null
-      >
+      Record<number, HTMLDivElement | null>
     >({});
 
   // ============================================================
-  // Action item state
+  // Action items
   // ============================================================
 
   const [
@@ -167,6 +166,24 @@ const showToast = (
   ] = useState("");
 
   // ============================================================
+  // Toast
+  // ============================================================
+
+  const showToast = (
+    message: string,
+    type: "success" | "error" = "success"
+  ) => {
+    setToast({
+      message,
+      type,
+    });
+
+    window.setTimeout(() => {
+      setToast(null);
+    }, 3000);
+  };
+
+  // ============================================================
   // Load meeting
   // ============================================================
 
@@ -174,51 +191,58 @@ const showToast = (
     const meetingId = Number(id);
 
     if (
-      Number.isNaN(meetingId)
+      !Number.isInteger(meetingId) ||
+      meetingId <= 0
     ) {
-      setError(
-        "Invalid meeting."
-      );
-
+      setError("Invalid meeting.");
       setLoading(false);
-
       return;
     }
 
-    const loadMeeting =
-      async () => {
-        try {
-          setLoading(true);
-          setError("");
+    let cancelled = false;
 
-          const data =
-            await getMeeting(
-              meetingId
-            );
+    const loadMeeting = async () => {
+      try {
+        setLoading(true);
+        setError("");
 
-          setMeeting(data);
+        const data =
+          await getMeeting(meetingId);
 
-          setCurrentTime(0);
-          setIsPlaying(false);
-        } catch (err) {
-          console.error(
-            "Failed to load meeting:",
-            err
-          );
+        if (cancelled) {
+          return;
+        }
 
+        setMeeting(data);
+        setCurrentTime(0);
+        setIsPlaying(false);
+      } catch (err) {
+        console.error(
+          "Failed to load meeting:",
+          err
+        );
+
+        if (!cancelled) {
           setError(
             "Unable to load this meeting."
           );
-        } finally {
+        }
+      } finally {
+        if (!cancelled) {
           setLoading(false);
         }
-      };
+      }
+    };
 
     loadMeeting();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   // ============================================================
-  // Simulated media player
+  // Player
   // ============================================================
 
   useEffect(() => {
@@ -235,7 +259,7 @@ const showToast = (
     playbackOffsetRef.current =
       currentTime;
 
-    let animationFrameId: number;
+    let animationFrameId = 0;
 
     const updatePlayback = (
       now: number
@@ -272,9 +296,7 @@ const showToast = (
         return;
       }
 
-      setCurrentTime(
-        nextTime
-      );
+      setCurrentTime(nextTime);
 
       animationFrameId =
         requestAnimationFrame(
@@ -292,10 +314,7 @@ const showToast = (
         animationFrameId
       );
     };
-  }, [
-    isPlaying,
-    meeting,
-  ]);
+  }, [isPlaying, meeting]);
 
   // ============================================================
   // Active transcript segment
@@ -337,9 +356,7 @@ const showToast = (
   // ============================================================
 
   if (loading) {
-    return (
-      <MeetingLoading />
-    );
+    return <MeetingLoading />;
   }
 
   if (
@@ -361,9 +378,7 @@ const showToast = (
           <button
             type="button"
             onClick={() =>
-              router.push(
-                "/meetings"
-              )
+              router.push("/meetings")
             }
             className="mt-5 rounded-md bg-[#6d32e9] px-4 py-2 text-sm font-medium text-white"
           >
@@ -375,7 +390,7 @@ const showToast = (
   }
 
   // ============================================================
-  // Transcript search
+  // Search
   // ============================================================
 
   const searchTerm =
@@ -390,9 +405,7 @@ const showToast = (
           (segment) =>
             segment.text
               .toLowerCase()
-              .includes(
-                searchTerm
-              )
+              .includes(searchTerm)
         );
 
   // ============================================================
@@ -404,41 +417,35 @@ const showToast = (
   ) => {
     const safeTime =
       Math.min(
-        Math.max(
-          seconds,
-          0
-        ),
+        Math.max(seconds, 0),
         meeting.duration_seconds
       );
 
-    setCurrentTime(
-      safeTime
-    );
+    setCurrentTime(safeTime);
 
     playbackOffsetRef.current =
       safeTime;
 
-    playbackStartRef.current =
-      performance.now();
+    if (isPlaying) {
+      playbackStartRef.current =
+        performance.now();
+    }
   };
 
-  const togglePlayback =
-    () => {
-      if (
-        currentTime >=
-        meeting.duration_seconds
-      ) {
-        setCurrentTime(0);
+  const togglePlayback = () => {
+    if (
+      currentTime >=
+      meeting.duration_seconds
+    ) {
+      setCurrentTime(0);
+      playbackOffsetRef.current = 0;
+    }
 
-        playbackOffsetRef.current =
-          0;
-      }
-
-      setIsPlaying(
-        (previous) =>
-          !previous
-      );
-    };
+    setIsPlaying(
+      (previous) =>
+        !previous
+    );
+  };
 
   const handleSeek = (
     event: React.ChangeEvent<HTMLInputElement>
@@ -451,39 +458,47 @@ const showToast = (
   };
 
   const progress =
-    meeting.duration_seconds >
-    0
+    meeting.duration_seconds > 0
       ? (currentTime /
           meeting.duration_seconds) *
         100
       : 0;
 
   // ============================================================
-  // Meeting rename
+  // Rename
   // ============================================================
 
-  const handleRenameMeeting = async (
-  newTitle: string
-) => {
-  if (!meeting) {
-    return;
-  }
+  const handleRenameMeeting =
+    async (
+      newTitle: string
+    ) => {
+      try {
+        const updated =
+          await updateMeeting(
+            meeting.id,
+            {
+              title:
+                newTitle,
+            }
+          );
 
-  const updated = await updateMeeting(
-    meeting.id,
-    {
-      title: newTitle,
-    }
-  );
+        setMeeting(updated);
 
-  setMeeting(updated);
-  setShowRenameModal(false);
+        setShowRenameModal(
+          false
+        );
 
-  showToast("Meeting renamed");
-};
+        showToast(
+          "Meeting renamed"
+        );
+      } catch (err) {
+        console.error(err);
+        throw err;
+      }
+    };
 
   // ============================================================
-  // Action item CRUD
+  // Action items
   // ============================================================
 
   const handleToggleActionItem =
@@ -502,20 +517,29 @@ const showToast = (
             }
           );
 
-        setMeeting({
-          ...meeting,
+        setMeeting(
+          (current) => {
+            if (!current) {
+              return current;
+            }
 
-          action_items:
-            meeting.action_items.map(
-              (item) =>
-                item.id ===
-                updated.id
-                  ? updated
-                  : item
-            ),
-        });
+            return {
+              ...current,
+
+              action_items:
+                current.action_items.map(
+                  (item) =>
+                    item.id ===
+                    updated.id
+                      ? updated
+                      : item
+                ),
+            };
+          }
+        );
+
         showToast(
-        updated.is_completed
+          updated.is_completed
             ? "Action item completed"
             : "Action item reopened"
         );
@@ -524,6 +548,11 @@ const showToast = (
 
         setActionError(
           "Could not update action item."
+        );
+
+        showToast(
+          "Could not update action item",
+          "error"
         );
       }
     };
@@ -548,21 +577,28 @@ const showToast = (
             }
           );
 
-        setMeeting({
-          ...meeting,
+        setMeeting(
+          (current) => {
+            if (!current) {
+              return current;
+            }
 
-          action_items: [
-            ...meeting.action_items,
-            created,
-          ],
-        });
+            return {
+              ...current,
 
-        setNewActionText(
-          ""
+              action_items: [
+                ...current.action_items,
+                created,
+              ],
+            };
+          }
         );
 
-        setShowAddAction(
-          false
+        setNewActionText("");
+        setShowAddAction(false);
+
+        showToast(
+          "Action item added"
         );
       } catch (err) {
         console.error(err);
@@ -570,8 +606,12 @@ const showToast = (
         setActionError(
           "Could not add action item."
         );
+
+        showToast(
+          "Could not add action item",
+          "error"
+        );
       }
-      showToast("Action item added");
     };
 
   const handleEditActionItem =
@@ -609,26 +649,42 @@ const showToast = (
             }
           );
 
-        setMeeting({
-          ...meeting,
+        setMeeting(
+          (current) => {
+            if (!current) {
+              return current;
+            }
 
-          action_items:
-            meeting.action_items.map(
-              (item) =>
-                item.id ===
-                updated.id
-                  ? updated
-                  : item
-            ),
-        });
+            return {
+              ...current,
+
+              action_items:
+                current.action_items.map(
+                  (item) =>
+                    item.id ===
+                    updated.id
+                      ? updated
+                      : item
+                ),
+            };
+          }
+        );
+
+        showToast(
+          "Action item updated"
+        );
       } catch (err) {
         console.error(err);
 
         setActionError(
           "Could not edit action item."
         );
+
+        showToast(
+          "Could not edit action item",
+          "error"
+        );
       }
-      showToast("Action item updated");
     };
 
   const handleDeleteActionItem =
@@ -651,24 +707,40 @@ const showToast = (
           actionItem.id
         );
 
-        setMeeting({
-          ...meeting,
+        setMeeting(
+          (current) => {
+            if (!current) {
+              return current;
+            }
 
-          action_items:
-            meeting.action_items.filter(
-              (item) =>
-                item.id !==
-                actionItem.id
-            ),
-        });
+            return {
+              ...current,
+
+              action_items:
+                current.action_items.filter(
+                  (item) =>
+                    item.id !==
+                    actionItem.id
+                ),
+            };
+          }
+        );
+
+        showToast(
+          "Action item deleted"
+        );
       } catch (err) {
         console.error(err);
 
         setActionError(
           "Could not delete action item."
         );
+
+        showToast(
+          "Could not delete action item",
+          "error"
+        );
       }
-      showToast("Action item deleted");
     };
 
   // ============================================================
@@ -703,8 +775,6 @@ const showToast = (
         true
       );
 
-      // Pause playback while
-      // editing transcript.
       setIsPlaying(false);
     };
 
@@ -734,8 +804,6 @@ const showToast = (
           ""
         );
 
-        // Reject blank
-        // transcript segments.
         const hasEmptySegment =
           meeting.transcript_segments.some(
             (segment) =>
@@ -757,8 +825,6 @@ const showToast = (
           return;
         }
 
-        // Only update segments
-        // whose text changed.
         const changedSegments =
           meeting.transcript_segments.filter(
             (segment) =>
@@ -813,18 +879,26 @@ const showToast = (
             )
           );
 
-        setMeeting({
-          ...meeting,
+        setMeeting(
+          (current) => {
+            if (!current) {
+              return current;
+            }
 
-          transcript_segments:
-            meeting.transcript_segments.map(
-              (segment) =>
-                updatedMap.get(
-                  segment.id
-                ) ??
-                segment
-            ),
-        });
+            return {
+              ...current,
+
+              transcript_segments:
+                current.transcript_segments.map(
+                  (segment) =>
+                    updatedMap.get(
+                      segment.id
+                    ) ??
+                    segment
+                ),
+            };
+          }
+        );
 
         setEditedTranscript(
           {}
@@ -833,27 +907,256 @@ const showToast = (
         setIsEditingTranscript(
           false
         );
+
+        showToast(
+          "Transcript updated"
+        );
       } catch (err) {
         console.error(err);
 
         setTranscriptEditError(
           "Could not save transcript changes."
         );
+
+        showToast(
+          "Could not save transcript",
+          "error"
+        );
       } finally {
         setSavingTranscript(
           false
         );
       }
-      showToast("Transcript updated");
     };
 
   // ============================================================
-  // UI
+  // Export
+  // ============================================================
+
+  const downloadFile = (
+    content: string,
+    filename: string,
+    mimeType: string
+  ) => {
+    const blob =
+      new Blob(
+        [content],
+        {
+          type:
+            mimeType,
+        }
+      );
+
+    const url =
+      URL.createObjectURL(
+        blob
+      );
+
+    const anchor =
+      document.createElement(
+        "a"
+      );
+
+    anchor.href =
+      url;
+
+    anchor.download =
+      filename;
+
+    document.body.appendChild(
+      anchor
+    );
+
+    anchor.click();
+    anchor.remove();
+
+    window.setTimeout(
+      () => {
+        URL.revokeObjectURL(
+          url
+        );
+      },
+      0
+    );
+  };
+
+  const handleExportTranscript =
+    () => {
+      const lines =
+        meeting.transcript_segments.map(
+          (segment) =>
+            `[${formatPlayerTime(
+              segment.start_time
+            )}] ${
+              segment.speaker
+                ?.name ??
+              "Unknown speaker"
+            }: ${segment.text}`
+        );
+
+      const content = [
+        meeting.title,
+
+        formatMeetingDate(
+          meeting.meeting_date
+        ),
+
+        `Duration: ${formatDuration(
+          meeting.duration_seconds
+        )}`,
+
+        "",
+
+        "TRANSCRIPT",
+
+        "",
+
+        ...lines,
+      ].join("\n");
+
+      downloadFile(
+        content,
+
+        `${safeFilename(
+          meeting.title
+        )}-transcript.txt`,
+
+        "text/plain;charset=utf-8"
+      );
+
+      setShowExportMenu(
+        false
+      );
+
+      showToast(
+        "Transcript exported"
+      );
+    };
+
+  const handleExportSummary =
+    () => {
+      const actionItems =
+        meeting.action_items.length >
+        0
+          ? meeting.action_items.map(
+              (item) =>
+                `- [${
+                  item.is_completed
+                    ? "x"
+                    : " "
+                }] ${item.text}${
+                  item.assignee
+                    ? ` — ${item.assignee.name}`
+                    : ""
+                }`
+            )
+          : [
+              "No action items.",
+            ];
+
+      const chapters =
+        meeting.chapters.length >
+        0
+          ? meeting.chapters.map(
+              (chapter) =>
+                `### ${formatPlayerTime(
+                  chapter.start_time
+                )} — ${chapter.title}\n\n${
+                  chapter.summary ||
+                  "No chapter summary."
+                }`
+            )
+          : [
+              "No meeting outline available.",
+            ];
+
+      const participants =
+        meeting.participants.length >
+        0
+          ? meeting.participants.map(
+              (participant) =>
+                `- ${participant.name}`
+            )
+          : [
+              "No participants.",
+            ];
+
+      const content = [
+        `# ${meeting.title}`,
+
+        "",
+
+        `**Date:** ${formatMeetingDate(
+          meeting.meeting_date
+        )}`,
+
+        `**Duration:** ${formatDuration(
+          meeting.duration_seconds
+        )}`,
+
+        "",
+
+        "## Overview",
+
+        "",
+
+        meeting.summary
+          ?.overview ||
+          "No summary available.",
+
+        "",
+
+        "## Action Items",
+
+        "",
+
+        ...actionItems,
+
+        "",
+
+        "## Meeting Outline",
+
+        "",
+
+        ...chapters,
+
+        "",
+
+        "## Participants",
+
+        "",
+
+        ...participants,
+
+        "",
+      ].join("\n");
+
+      downloadFile(
+        content,
+
+        `${safeFilename(
+          meeting.title
+        )}-notes.md`,
+
+        "text/markdown;charset=utf-8"
+      );
+
+      setShowExportMenu(
+        false
+      );
+
+      showToast(
+        "AI Notes exported"
+      );
+    };
+
+  // ============================================================
+  // Render
   // ============================================================
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#121212] text-[#ededed]">
-      {/* Meeting header */}
+      {/* Header */}
       <header className="flex h-[72px] shrink-0 items-center border-b border-[#292929] bg-[#171717] px-5">
         <button
           type="button"
@@ -885,7 +1188,11 @@ const showToast = (
 
               <button
                 type="button"
-                onClick={() => setShowRenameModal(true)}
+                onClick={() =>
+                  setShowRenameModal(
+                    true
+                  )
+                }
                 aria-label="Edit meeting title"
                 className="text-[#777] hover:text-white"
               >
@@ -916,8 +1223,14 @@ const showToast = (
         </div>
 
         <div className="ml-auto flex items-center gap-2">
+          {/* Share */}
           <button
             type="button"
+            onClick={() =>
+              setComingSoonFeature(
+                "Team & Sharing"
+              )
+            }
             className="hidden h-9 items-center gap-2 rounded-md border border-[#343434] px-3 text-sm text-[#bbb] transition-colors hover:bg-[#242424] hover:text-white md:flex"
           >
             <Share2
@@ -927,18 +1240,83 @@ const showToast = (
             Share
           </button>
 
-          <button
-            type="button"
-            aria-label="Download meeting"
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-[#343434] text-[#aaa] hover:bg-[#242424] hover:text-white"
-          >
-            <Download
-              size={16}
-            />
-          </button>
+          {/* Export */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() =>
+                setShowExportMenu(
+                  (previous) =>
+                    !previous
+                )
+              }
+              aria-label="Export meeting"
+              className="flex h-9 w-9 items-center justify-center rounded-md border border-[#343434] text-[#aaa] hover:bg-[#242424] hover:text-white"
+            >
+              <Download
+                size={16}
+              />
+            </button>
 
+            {showExportMenu && (
+              <div className="absolute right-0 top-11 z-50 w-[210px] overflow-hidden rounded-lg border border-[#343434] bg-[#202020] p-1 shadow-2xl">
+                <button
+                  type="button"
+                  onClick={
+                    handleExportTranscript
+                  }
+                  className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left hover:bg-[#303030]"
+                >
+                  <FileText
+                    size={15}
+                    className="text-[#999]"
+                  />
+
+                  <div>
+                    <div className="text-sm text-[#ddd]">
+                      Transcript
+                    </div>
+
+                    <div className="text-[11px] text-[#777]">
+                      Download as TXT
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={
+                    handleExportSummary
+                  }
+                  className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left hover:bg-[#303030]"
+                >
+                  <Sparkles
+                    size={15}
+                    className="text-[#9c75ff]"
+                  />
+
+                  <div>
+                    <div className="text-sm text-[#ddd]">
+                      AI Notes
+                    </div>
+
+                    <div className="text-[11px] text-[#777]">
+                      Download as Markdown
+                    </div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* More */}
           <button
             type="button"
+            onClick={() =>
+              setComingSoonFeature(
+                "More Meeting Actions"
+              )
+            }
             aria-label="More meeting actions"
             className="flex h-9 w-9 items-center justify-center rounded-md border border-[#343434] text-[#aaa] hover:bg-[#242424] hover:text-white"
           >
@@ -946,35 +1324,12 @@ const showToast = (
               size={18}
             />
           </button>
-
-          {showRenameModal && (
-  <RenameMeetingModal
-    currentTitle={meeting.title}
-    onClose={() =>
-      setShowRenameModal(false)
-    }
-    onRename={handleRenameMeeting}
-  />
-)}
-
-{toast && (
-  <Toast
-    message={toast.message}
-    type={toast.type}
-    onClose={() => setToast(null)}
-  />
-)}
-
-          
         </div>
       </header>
 
-      {/* Main workspace */}
+      {/* Workspace */}
       <main className="flex min-h-0 flex-1 overflow-hidden">
-        {/* ====================================================
-            AI NOTES
-        ==================================================== */}
-
+        {/* AI Notes */}
         <section className="flex w-[48%] min-w-0 flex-col border-r border-[#292929] bg-[#121212]">
           <div className="flex h-[58px] shrink-0 items-center justify-between border-b border-[#292929] px-6">
             <div className="flex items-center gap-2">
@@ -1083,9 +1438,7 @@ const showToast = (
                       className="flex h-8 items-center gap-1 rounded-md px-3 text-xs text-[#999] hover:bg-[#292929] hover:text-white"
                     >
                       <X
-                        size={
-                          13
-                        }
+                        size={13}
                       />
 
                       Cancel
@@ -1115,9 +1468,7 @@ const showToast = (
                 </p>
               )}
 
-              {meeting
-                .action_items
-                .length >
+              {meeting.action_items.length >
               0 ? (
                 <div className="space-y-3">
                   {meeting.action_items.map(
@@ -1146,13 +1497,12 @@ const showToast = (
                 </div>
               ) : (
                 <EmptyText>
-                  No action items
-                  were identified.
+                  No action items were identified.
                 </EmptyText>
               )}
             </NotesSection>
 
-            {/* Meeting Outline */}
+            {/* Chapters */}
             <NotesSection
               icon={
                 <Clock3
@@ -1161,8 +1511,7 @@ const showToast = (
               }
               title="Meeting outline"
             >
-              {meeting.chapters
-                .length >
+              {meeting.chapters.length >
               0 ? (
                 <div className="space-y-1">
                   {meeting.chapters.map(
@@ -1190,9 +1539,7 @@ const showToast = (
                 </div>
               ) : (
                 <EmptyText>
-                  No meeting
-                  chapters are
-                  available.
+                  No meeting chapters are available.
                 </EmptyText>
               )}
             </NotesSection>
@@ -1236,12 +1583,9 @@ const showToast = (
           </div>
         </section>
 
-        {/* ====================================================
-            TRANSCRIPT
-        ==================================================== */}
-
+        {/* Transcript */}
         <section className="flex min-w-0 flex-1 flex-col bg-[#141414]">
-          {/* Transcript Header */}
+          {/* Header */}
           <div className="flex h-[58px] shrink-0 items-center justify-between border-b border-[#292929] px-5">
             <div className="flex items-center gap-2">
               <FileText
@@ -1261,7 +1605,6 @@ const showToast = (
               </span>
             </div>
 
-            {/* Edit / Save controls */}
             <div className="flex items-center gap-2">
               {isEditingTranscript ? (
                 <>
@@ -1311,7 +1654,7 @@ const showToast = (
             </div>
           </div>
 
-          {/* Transcript Search */}
+          {/* Search */}
           <div className="border-b border-[#292929] p-4">
             <div className="flex h-9 items-center gap-2 rounded-md border border-[#333] bg-[#1a1a1a] px-3">
               <Search
@@ -1359,7 +1702,7 @@ const showToast = (
             </div>
           )}
 
-          {/* Transcript Rows */}
+          {/* Rows */}
           <div className="flex-1 overflow-y-auto px-5 py-3">
             {filteredTranscript.length >
             0 ? (
@@ -1420,18 +1763,14 @@ const showToast = (
               )
             ) : (
               <div className="py-16 text-center text-sm text-[#777]">
-                No transcript
-                matches found.
+                No transcript matches found.
               </div>
             )}
           </div>
         </section>
       </main>
 
-      {/* ======================================================
-          PLAYER
-      ====================================================== */}
-
+      {/* Player */}
       <footer className="flex h-[72px] shrink-0 items-center border-t border-[#292929] bg-[#181818] px-6">
         <button
           type="button"
@@ -1512,12 +1851,58 @@ const showToast = (
           1x
         </button>
       </footer>
+
+      {/* Rename */}
+      {showRenameModal && (
+        <RenameMeetingModal
+          currentTitle={
+            meeting.title
+          }
+          onClose={() =>
+            setShowRenameModal(
+              false
+            )
+          }
+          onRename={
+            handleRenameMeeting
+          }
+        />
+      )}
+
+      {/* Coming Soon */}
+      {comingSoonFeature && (
+        <ComingSoonModal
+          feature={
+            comingSoonFeature
+          }
+          onClose={() =>
+            setComingSoonFeature(
+              null
+            )
+          }
+        />
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <Toast
+          message={
+            toast.message
+          }
+          type={
+            toast.type
+          }
+          onClose={() =>
+            setToast(null)
+          }
+        />
+      )}
     </div>
   );
 }
 
 // ============================================================
-// Notes Section
+// Notes section
 // ============================================================
 
 function NotesSection({
@@ -1547,7 +1932,7 @@ function NotesSection({
 }
 
 // ============================================================
-// Action Item
+// Action item
 // ============================================================
 
 function ActionItemRow({
@@ -1716,7 +2101,7 @@ function ChapterRow({
 }
 
 // ============================================================
-// Transcript Row
+// Transcript row
 // ============================================================
 
 function TranscriptRow({
@@ -1730,9 +2115,7 @@ function TranscriptRow({
   elementRef,
 }: {
   segment: TranscriptSegment;
-
   search: string;
-
   active: boolean;
 
   onSeek: (
@@ -1740,7 +2123,6 @@ function TranscriptRow({
   ) => void;
 
   editing: boolean;
-
   editedText: string;
 
   onTextChange: (
@@ -1893,7 +2275,7 @@ function TranscriptRow({
 }
 
 // ============================================================
-// Search Highlight
+// Search highlight
 // ============================================================
 
 function HighlightedText({
@@ -1963,7 +2345,7 @@ function HighlightedText({
 }
 
 // ============================================================
-// Empty State
+// Empty
 // ============================================================
 
 function EmptyText({
@@ -2071,34 +2453,47 @@ function formatMeetingDate(
 function formatDuration(
   seconds: number
 ) {
-  const minutes =
-    Math.floor(
-      seconds / 60
+  const totalSeconds =
+    Math.max(
+      0,
+      Math.floor(
+        seconds
+      )
     );
-
-  if (
-    minutes < 60
-  ) {
-    return `${minutes} min`;
-  }
 
   const hours =
     Math.floor(
-      minutes / 60
+      totalSeconds /
+        3600
     );
 
-  const remainingMinutes =
-    minutes % 60;
+  const minutes =
+    Math.floor(
+      (totalSeconds %
+        3600) /
+        60
+    );
 
-  return `${hours} hr ${remainingMinutes} min`;
+  const remainingSeconds =
+    totalSeconds %
+    60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${remainingSeconds}s`;
+  }
+
+  return `${minutes}m ${remainingSeconds}s`;
 }
 
 function formatPlayerTime(
   seconds: number
 ) {
   const totalSeconds =
-    Math.floor(
-      seconds
+    Math.max(
+      0,
+      Math.floor(
+        seconds
+      )
     );
 
   const minutes =
@@ -2108,7 +2503,8 @@ function formatPlayerTime(
     );
 
   const remainingSeconds =
-    totalSeconds % 60;
+    totalSeconds %
+    60;
 
   return `${minutes}:${remainingSeconds
     .toString()
@@ -2116,4 +2512,26 @@ function formatPlayerTime(
       2,
       "0"
     )}`;
+}
+
+function safeFilename(
+  value: string
+) {
+  const cleaned =
+    value
+      .trim()
+      .toLowerCase()
+      .replace(
+        /[^a-z0-9]+/g,
+        "-"
+      )
+      .replace(
+        /^-+|-+$/g,
+        ""
+      );
+
+  return (
+    cleaned ||
+    "meeting"
+  );
 }

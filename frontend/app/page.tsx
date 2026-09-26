@@ -1,16 +1,23 @@
+"use client";
+
 import {
   CalendarDays,
   ChevronRight,
   Upload,
   Video,
 } from "lucide-react";
+import { useState } from "react";
+import ComingSoonModal from "../components/ui/ComingSoonModal";
 
 import Sidebar from "../components/layout/Sidebar";
 import Topbar from "../components/layout/Topbar";
 import Logo from "../components/ui/Logo";
 
 export default function HomePage() {
+  const [comingSoonFeature, setComingSoonFeature] =
+  useState<string | null>(null);
   return (
+    
     <div className="min-h-screen bg-[#121212] text-[#ededed]">
       <Sidebar />
       <Topbar />
@@ -53,21 +60,31 @@ export default function HomePage() {
                 icon={<CalendarDays size={19} />}
                 title="Schedule Meeting"
                 className="border-[#65233c] bg-[#481326]"
+                onClick={() =>
+                  setComingSoonFeature("Schedule Meeting")
+                }
               />
 
               <QuickAction
                 icon={<Upload size={19} />}
                 title="Upload File"
                 className="border-[#164f45] bg-[#073a31]"
+                onClick={() =>
+                  setComingSoonFeature("Upload File")
+                }
               />
 
               <QuickAction
                 icon={<Video size={19} />}
                 title="Capture Meeting"
                 className="border-[#373078] bg-[#211b55]"
+                onClick={() =>
+                  setComingSoonFeature("Capture Meeting")
+                }
               />
             </div>
           </section>
+          
 
           {/* Recent meetings */}
           <section className="mt-11">
@@ -126,6 +143,14 @@ export default function HomePage() {
       >
         ?
       </button>
+      {comingSoonFeature && (
+  <ComingSoonModal
+    feature={comingSoonFeature}
+    onClose={() =>
+      setComingSoonFeature(null)
+    }
+  />
+)}
     </div>
   );
 }
@@ -134,16 +159,19 @@ type QuickActionProps = {
   icon: React.ReactNode;
   title: string;
   className: string;
+  onClick: () => void;
 };
 
 function QuickAction({
   icon,
   title,
   className,
+  onClick,
 }: QuickActionProps) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className={`flex h-[60px] items-center gap-3 rounded-lg border px-5 text-left transition-[filter] hover:brightness-110 ${className}`}
     >
       <span className="opacity-70">
